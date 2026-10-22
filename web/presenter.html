@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Докладчик</title>
+<style>
+  :root {
+    --bg: #0f1114; --raise: #171a1f; --line: #23272e; --fg: #ececee; --dim: #7d838d; --faint: #4a505a;
+    --accent: #6cb2ff; --warn: #f2b84b; --bad: #ff6464; --ok: #4cc38a;
+    --note-size: 30px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg);
+               font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif; }
+  body { display: grid; grid-template-rows: auto 1fr; height: 100vh; overflow: hidden; }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; padding: 0; }
+
+  /* ---- верхняя полоса ---- */
+  header { position: relative; display: flex; align-items: center; gap: 28px; padding: 14px 28px; }
+  #progress { position: absolute; left: 0; bottom: 0; height: 2px; background: var(--accent);
+              transition: width .25s ease; }
+  header::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+                  background: var(--line); z-index: -1; }
+  #pos { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: .01em; }
+  #pos span { color: var(--faint); font-weight: 400; }
+  #title { color: var(--dim); font-size: 14px; flex: 1; min-width: 0; white-space: nowrap;
+           overflow: hidden; text-overflow: ellipsis; }
+  #timer { display: flex; align-items: baseline; gap: 12px; font-variant-numeric: tabular-nums; }
+  #elapsed { font-size: 26px; font-weight: 600; }
+  #elapsed.paused { color: var(--faint); }
+  #remain { font-size: 14px; color: var(--dim); }
+  #remain.warn { color: var(--warn); } #remain.bad { color: var(--bad); }
+  #pace { font-size: 14px; color: var(--dim); font-variant-numeric: tabular-nums; }
+  #pace.ahead { color: var(--ok); } #pace.behind { color: var(--warn); } #pace.late { color: var(--bad); }
+  #aud { display: flex; align-items: center; gap: 8px; font-size: 14px; padding: 7px 14px;
+         border-radius: 999px; background: var(--raise); border: 1px solid var(--line); }
+  #aud:hover { border-color: var(--faint); }
+  #aud i { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); }
+  #aud.on i { background: var(--ok); box-shadow: 0 0 0 3px #4cc38a33; }
+  #help-btn { width: 30px; height: 30px; border-radius: 50%; color: var(--dim); border: 1px solid var(--line); }
+  #help-btn:hover { color: var(--fg); border-color: var(--faint); }
+  #warn { color: var(--warn); font-size: 18px; cursor: help; }
+  #warn:empty { display: none; }
+
+  /* ---- рабочая область ---- */
+  main { display: grid; grid-template-columns: minmax(360px, 58%) 1fr; min-height: 0; }
+  .slides { display: flex; flex-direction: column; padding: 24px 0 24px 28px; min-height: 0; overflow: hidden; }
+  .shot { position: relative; }
+  .shot img { display: block; max-width: 100%; border-radius: 6px; }
+  #cur-shot img { max-height: 64vh; }
+  #next-shot img { max-height: 19vh; max-width: 38%; }
+
+  /* время на слайд */
+  #slide-time { display: flex; align-items: center; gap: 14px; margin-top: 12px; max-width: 100%;
+                font-variant-numeric: tabular-nums; font-size: 15px; color: var(--dim); }
+  #slide-time .track { flex: 1; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+  #slide-time .fill { height: 100%; width: 0; background: var(--accent); border-radius: 3px;
+                      transition: width .25s linear, background .3s; }
+  #slide-time.warn .fill { background: var(--warn); } #slide-time.warn #st-text { color: var(--warn); }
+  #slide-time.over .fill { background: var(--bad); }  #slide-time.over #st-text { color: var(--bad); font-weight: 600; }
+  #slide-time.over .track { animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .45; } }
+  #next-label { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--faint);
+                margin: 22px 0 8px; }
+  #next-shot img { opacity: .55; }
+  #next-shot.end img { visibility: hidden; }
+  #cur-shot.black img { opacity: .15; }
+  #cur-shot.black::after { content: "экран скрыт"; position: absolute; left: 16px; top: 14px;
+           font-size: 13px; color: var(--warn); letter-spacing: .04em; }
+
+  .notes { overflow-y: auto; padding: 24px 40px 45vh 40px; min-height: 0; scroll-behavior: smooth;
+           scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+  #note-title { font-size: 15px; font-weight: 500; color: var(--accent); margin: 2px 0 18px;
+                letter-spacing: .02em; }
+  #note-title .tag { margin-left: 10px; font-size: 12px; color: var(--warn); }
+  #note { font-size: var(--note-size); line-height: 1.55; max-width: 44ch; }
+  #note p { margin: 0 0 .75em; }
+  #note ul { margin: 0 0 .75em; padding-left: 1.1em; }
+  #note mark { background: none; color: var(--warn); }
+  #note strong { color: #fff; font-weight: 650; }
+  #note code { font-size: .85em; background: var(--raise); padding: 0 .3em; border-radius: 4px; }
+  #note .cue { font-size: .62em; color: var(--dim); margin: 0 0 .9em; }
+  #note .cue::before { content: "↳ "; color: var(--faint); }
+  #note .empty { color: var(--faint); }
+  #upnext { margin-top: 28px; font-size: 15px; color: var(--dim); }
+
+  /* ---- наложения ---- */
+  .overlay { position: fixed; inset: 0; display: none; place-items: center; background: #0009;
+             backdrop-filter: blur(2px); }
+  .overlay.show { display: grid; }
+  #goto-box { font-size: 64px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--fg); }
+  #help-box { background: var(--raise); border: 1px solid var(--line); border-radius: 14px; padding: 26px 32px;
+              display: grid; grid-template-columns: auto auto; gap: 10px 28px; font-size: 15px; }
+  #help-box kbd { font: 13px ui-monospace, monospace; color: var(--fg); background: var(--bg);
+                  border: 1px solid var(--line); border-radius: 5px; padding: 2px 7px; margin-right: 4px; }
+  #help-box span:nth-child(even) { color: var(--dim); }
+
+  @media (max-width: 860px) {
+    main { grid-template-columns: 1fr; } .slides { display: none; } #title { display: none; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div id="pos">–</div>
+  <div id="title"></div>
+  <span id="warn"></span>
+  <button id="timer" title="Пауза / старт — T">
+    <span id="elapsed" class="paused">00:00</span><span id="remain"></span>
+  </button>
+  <span id="pace" title="Темп относительно плана"></span>
+  <button id="aud" title="Открыть окно для показа — A"><i></i><span>Показ</span></button>
+  <button id="help-btn" title="Клавиши — ?">?</button>
+  <div id="progress"></div>
+</header>
+<main>
+  <section class="slides">
+    <div class="shot" id="cur-shot"><img id="cur" alt=""></div>
+    <div id="slide-time" title="Время на этом слайде / по плану"><div class="track"><div class="fill"></div></div><span id="st-text"></span></div>
+    <div id="next-label">Далее</div>
+    <div class="shot" id="next-shot"><img id="next" alt=""></div>
+  </section>
+  <section class="notes" id="notes">
+    <div id="note-title"></div>
+    <div id="note"></div>
+    <div id="upnext"></div>
+  </section>
+</main>
+<div class="overlay" id="goto"><div id="goto-box"></div></div>
+<div class="overlay" id="help">
+  <div id="help-box">
+    <span><kbd>→</kbd><kbd>Space</kbd><kbd>PgDn</kbd></span><span>вперёд</span>
+    <span><kbd>←</kbd><kbd>PgUp</kbd></span><span>назад</span>
+    <span><kbd>↑</kbd><kbd>↓</kbd></span><span>прокрутить текст</span>
+    <span><kbd>12</kbd><kbd>Enter</kbd></span><span>перейти к слайду</span>
+    <span><kbd>B</kbd></span><span>скрыть экран</span>
+    <span><kbd>T</kbd> · <kbd>Shift R</kbd></span><span>таймер: пауза · сброс</span>
+    <span><kbd>+</kbd><kbd>−</kbd></span><span>размер текста</span>
+    <span><kbd>A</kbd></span><span>открыть окно показа</span>
+    <span><kbd>F</kbd> в окне показа</span><span>полный экран</span>
+  </div>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+// шрифт помним всегда, слайд и таймер — только до закрытия окна (переживают перезагрузку страницы)
+const keep = (area) => ({
+  get(k, d) { try { const v = area.getItem('pp.' + k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { area.setItem('pp.' + k, JSON.stringify(v)); } catch {} },
+});
+const prefs = keep(localStorage), store = keep(sessionStorage);
+
+let deck = {count: 0, notes: {}, minutes: 0, title: ''};
+let slide = store.get('slide', 1), black = false;
+let fontSize = prefs.get('font', 30);
+let timer = store.get('timer', {acc: 0, start: null});  // acc мс, start — epoch, если идёт
+let spent = store.get('spent', {});                      // мс, проведённые на каждом слайде
+let budget = [], planEnd = [], lastTick = Date.now();
+let gotoBuf = '', gotoTimer, audience = 0;
+
+const post = (url, data) => fetch(url, {method: 'POST', body: JSON.stringify(data)}).catch(() => {});
+function broadcast() { post('/api/state', {slide, black, count: deck.count}); }
+
+function render() {
+  const n = deck.count;
+  slide = Math.min(Math.max(1, slide), n || 1);
+  store.set('slide', slide);
+  $('pos').innerHTML = `${slide}<span> / ${n}</span>`;
+  $('progress').style.width = n ? `${slide / n * 100}%` : 0;
+  $('cur').src = `/slide/${slide}.png`;
+  $('cur-shot').classList.toggle('black', black);
+  $('next-shot').classList.toggle('end', slide >= n);
+  if (slide < n) $('next').src = `/slide/${slide + 1}.png`;
+  $('next-label').textContent = slide < n ? 'Далее' : 'Конец';
+  slideTime(elapsed());
+  const note = deck.notes[slide];
+  $('note-title').textContent = note ? note.title : `Слайд ${slide}`;
+  if (note && note.reserve) $('note-title').insertAdjacentHTML('beforeend', '<span class="tag">резерв</span>');
+  $('note').innerHTML = note && note.html ? note.html : '<p class="empty">Без текста</p>';
+  const nx = deck.notes[slide + 1];
+  $('upnext').textContent = slide < n ? `Дальше — ${nx ? nx.title : 'слайд ' + (slide + 1)}` : '';
+  $('notes').scrollTop = 0;
+  broadcast();
+}
+
+function go(n) { if (n !== slide) { slide = n; if (timer.start === null && timer.acc === 0) toggleTimer(); render(); } }
+function setFont(px) { fontSize = Math.min(64, Math.max(16, px)); prefs.set('font', fontSize);
+  document.documentElement.style.setProperty('--note-size', fontSize + 'px'); }
+function overlay(id, on) { $(id).classList.toggle('show', on); }
+
+// ---------- таймер ----------
+const fmt = ms => { const s = Math.floor(Math.abs(ms) / 1000);
+  return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`; };
+function elapsed() { return timer.acc + (timer.start ? Date.now() - timer.start : 0); }
+function toggleTimer() {
+  if (timer.start) { timer.acc = elapsed(); timer.start = null; } else timer.start = Date.now();
+  store.set('timer', timer); tick();
+}
+function resetTimer() { timer = {acc: 0, start: null}; spent = {}; store.set('timer', timer); store.set('spent', spent); tick(); }
+
+// План по слайдам: явное «@0:45» в заголовке, остальное делим пропорционально числу слов.
+// Без общей длительности — темп речи ~130 слов/мин.
+function computeBudgets() {
+  const n = deck.count, words = [], fixed = [];
+  for (let i = 1; i <= n; i++) {
+    const note = deck.notes[i];
+    fixed[i] = note && note.seconds != null ? note.seconds * 1000 : null;
+    words[i] = note ? note.words : 0;
+  }
+  let fixedSum = 0, wordSum = 0, free = 0;
+  for (let i = 1; i <= n; i++) {
+    if (fixed[i] != null) fixedSum += fixed[i]; else { wordSum += words[i]; free++; }
+  }
+  const total = deck.minutes > 0 ? deck.minutes * 60000 : fixedSum + wordSum / 130 * 60000;
+  const pool = Math.max(0, total - fixedSum);
+  budget = []; planEnd = [0];
+  for (let i = 1; i <= n; i++) {
+    budget[i] = fixed[i] != null ? fixed[i] : wordSum ? pool * words[i] / wordSum : free ? pool / free : 0;
+    planEnd[i] = planEnd[i - 1] + budget[i];
+  }
+}
+function tick() {
+  const now = Date.now();
+  if (timer.start) { spent[slide] = (spent[slide] || 0) + (now - lastTick); store.set('spent', spent); }
+  lastTick = now;
+  const e = elapsed();
+  $('elapsed').textContent = fmt(e);
+  $('elapsed').classList.toggle('paused', !timer.start);
+  const r = $('remain');
+  if (deck.minutes > 0) {
+    const left = deck.minutes * 60000 - e;
+    r.textContent = left >= 0 ? `−${fmt(left)}` : `+${fmt(left)}`;
+    r.className = left < 0 ? 'bad' : left < 60000 ? 'warn' : '';
+  } else r.textContent = '';
+  slideTime(e);
+  const on = audience > 0;
+  $('aud').classList.toggle('on', on);
+  $('aud').title = on ? 'Окно показа открыто' : 'Открыть окно для показа — A';
+}
+setInterval(tick, 250);
+
+function slideTime(e) {
+  const b = budget[slide], here = spent[slide] || 0, box = $('slide-time');
+  if (!b) { box.style.visibility = 'hidden'; $('pace').textContent = ''; return; }
+  box.style.visibility = '';
+  const over = here > b;
+  box.querySelector('.fill').style.width = Math.min(100, here / b * 100) + '%';
+  box.className = over ? 'over' : here > b * .8 ? 'warn' : '';
+  $('st-text').textContent = over ? `+${fmt(here - b)} сверх ${fmt(b)}` : `${fmt(here)} / ${fmt(b)}`;
+  // темп: где мы относительно плана с учётом времени на текущем слайде
+  const pace = $('pace');
+  if (!timer.start && !timer.acc) { pace.textContent = ''; return; }
+  const diff = e - (planEnd[slide - 1] + Math.min(here, b));
+  if (Math.abs(diff) < 5000) { pace.textContent = 'по плану'; pace.className = ''; }
+  else if (diff < 0) { pace.textContent = `запас ${fmt(diff)}`; pace.className = 'ahead'; }
+  else { pace.textContent = `отстаём ${fmt(diff)}`; pace.className = diff > 30000 ? 'late' : 'behind'; }
+}
+
+// ---------- клавиши ----------
+function handleKey(key) {
+  const n = deck.count;
+  if ($('help').classList.contains('show')) { overlay('help', false); return true; }
+  if (/^[0-9]$/.test(key)) {
+    gotoBuf += key; $('goto-box').textContent = gotoBuf; overlay('goto', true);
+    clearTimeout(gotoTimer); gotoTimer = setTimeout(() => { gotoBuf = ''; overlay('goto', false); }, 2500);
+    return true;
+  }
+  if (key === 'Enter' && gotoBuf) {
+    go(Math.min(n, Math.max(1, +gotoBuf))); gotoBuf = ''; overlay('goto', false); return true;
+  }
+  switch (key) {
+    case 'ArrowRight': case 'PageDown': case ' ': case 'Enter': case 'n': if (slide < n) go(slide + 1); return true;
+    case 'ArrowLeft': case 'PageUp': case 'Backspace': case 'p': if (slide > 1) go(slide - 1); return true;
+    case 'Home': go(1); return true;
+    case 'End': go(n); return true;
+    case 'ArrowDown': $('notes').scrollBy(0, fontSize * 3); return true;
+    case 'ArrowUp': $('notes').scrollBy(0, -fontSize * 3); return true;
+    case 'b': case 'B': case '.': black = !black; render(); return true;
+    case 't': case 'T': toggleTimer(); return true;
+    case 'R': resetTimer(); return true;
+    case '+': case '=': setFont(fontSize + 2); return true;
+    case '-': case '_': setFont(fontSize - 2); return true;
+    case 'a': case 'A': openAudience(); return true;
+    case '?': overlay('help', true); return true;
+    case 'Escape': gotoBuf = ''; overlay('goto', false); return true;
+  }
+  return false;
+}
+addEventListener('keydown', e => {
+  if (e.ctrlKey || e.altKey || e.metaKey) return;
+  if (handleKey(e.key)) e.preventDefault();
+});
+
+// окно показа шлёт клавиши через сервер, сервер сообщает, сколько окон показа открыто
+new EventSource('/api/events?role=presenter').onmessage = ({data}) => {
+  const m = JSON.parse(data);
+  if (m.type === 'audience') { audience = m.n; tick(); }
+  if (m.type === 'key') handleKey(m.key);
+};
+
+function openAudience() {
+  if (window.pywebview) pywebview.api.open_audience();  // Mac/pywebview: window.open там не работает
+  else window.open('/audience', 'pitch-audience', 'width=1280,height=760');
+}
+$('aud').onclick = openAudience;
+$('timer').onclick = toggleTimer;
+$('help-btn').onclick = () => overlay('help', true);
+$('help').onclick = () => overlay('help', false);
+
+// ---------- данные ----------
+let version = null;
+async function load() {
+  deck = await (await fetch('/api/deck')).json();
+  computeBudgets();
+  document.title = `Докладчик — ${deck.title}`;
+  $('title').textContent = deck.title;
+  $('warn').textContent = deck.warnings.length ? '⚠' : '';
+  $('warn').title = deck.warnings.join('\n');
+  const scroll = $('notes').scrollTop;
+  render();
+  $('notes').scrollTop = scroll;
+}
+async function poll() {
+  try {
+    const {v} = await (await fetch('/api/version')).json();
+    if (version !== null && v !== version) await load();
+    version = v;
+  } catch {}
+}
+setFont(fontSize);
+load().then(() => { for (let i = 1; i <= deck.count; i++) new Image().src = `/slide/${i}.png`; });
+setInterval(poll, 1500); poll();
+</script>
+</body>
+</html>

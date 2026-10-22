@@ -1,0 +1,28 @@
+name: macOS build
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, macos-15-intel]   # Apple Silicon и Intel
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: PYTHON=python ./build-mac.sh
+      - name: Smoke test
+        run: |
+          APP="dist/Pitch Presenter.app/Contents/MacOS/Pitch Presenter"
+          test -x "$APP"
+          ls "dist/Pitch Presenter.app/Contents/Resources/web" "dist/Pitch Presenter.app/Contents/Frameworks/web" 2>/dev/null || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PitchPresenter-${{ matrix.os }}
+          path: dist/*.dmg

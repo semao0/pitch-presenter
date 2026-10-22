@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Показ</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  body.idle { cursor: none; }
+  img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+  #black { position: absolute; inset: 0; background: #000; display: none; }
+  #hint { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); color: #888;
+          font: 14px system-ui, sans-serif; background: #111c; padding: 6px 12px; border-radius: 6px;
+          transition: opacity .6s; }
+</style>
+</head>
+<body>
+<img id="slide" alt="">
+<div id="black"></div>
+<div id="hint">Двойной клик — полный экран · стрелки листают</div>
+<script>
+const img = document.getElementById('slide');
+const black = document.getElementById('black');
+const cache = {};
+
+function show(n) {
+  img.src = `/slide/${n}.png`;
+  document.title = `Показ — ${n}`;
+}
+new EventSource('/api/events?role=audience').onmessage = ({data: raw}) => {
+  const data = JSON.parse(raw);
+  if (data.type !== 'state') return;
+  show(data.slide);
+  black.style.display = data.black ? 'block' : 'none';
+  if (data.count && !cache.done) {
+    for (let i = 1; i <= data.count; i++) (cache[i] = new Image()).src = `/slide/${i}.png`;
+    cache.done = true;
+  }
+};
+
+// клавиши пересылаем докладчику, чтобы листать с фокусом в любом окне
+addEventListener('keydown', e => {
+  if (e.key === 'f' || e.key === 'F') { toggleFs(); return; }
+  fetch('/api/key', {method: 'POST', body: JSON.stringify({key: e.key})}).catch(() => {});
+  e.preventDefault();
+});
+function toggleFs() {
+  if (window.pywebview) return pywebview.api.fullscreen();
+  document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+}
+addEventListener('dblclick', toggleFs);
+
+let t;
+addEventListener('mousemove', () => {
+  document.body.classList.remove('idle');
+  clearTimeout(t);
+  t = setTimeout(() => document.body.classList.add('idle'), 1500);
+});
+setTimeout(() => document.getElementById('hint').style.opacity = 0, 4000);
+</script>
+</body>
+</html>

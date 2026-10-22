@@ -1,7 +1,7 @@
 #!/bin/sh
 # Сборка .deb: ./build-deb.sh → dist/pitch-presenter_<ver>_all.deb
 set -eu
-VER=1.3.1
+VER=1.3.2
 cd "$(dirname "$0")"
 ROOT=$(mktemp -d)
 trap 'rm -rf "$ROOT"' EXIT

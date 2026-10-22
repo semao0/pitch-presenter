@@ -299,7 +299,7 @@ async function pollBus() {
     keySeq = m.seq;
     if ((m.audience ? 1 : 0) !== audience) { audience = m.audience ? 1 : 0; tick(); }
   } catch {}
-  setTimeout(pollBus, 150);
+  setTimeout(pollBus, 80);
 }
 pollBus();
 

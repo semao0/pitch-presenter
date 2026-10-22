@@ -6,7 +6,8 @@
 <style>
   html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
   body.idle { cursor: none; }
-  img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+  img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; visibility: hidden; }
+  img.on { visibility: visible; }
   #black { position: absolute; inset: 0; background: #000; display: none; }
   #hint { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); color: #888;
           font: 14px system-ui, sans-serif; background: #111c; padding: 6px 12px; border-radius: 6px;
@@ -14,16 +15,26 @@
 </style>
 </head>
 <body>
-<img id="slide" alt="">
+<img id="a" alt=""><img id="b" alt="">
 <div id="black"></div>
 <div id="hint">Двойной клик — полный экран · стрелки листают</div>
 <script>
-const img = document.getElementById('slide');
+const imgs = [document.getElementById('a'), document.getElementById('b')];
 const black = document.getElementById('black');
 const cache = {};
 
-function show(n) {
-  img.src = `/slide/${n}.png`;
+// два кадра: новый слайд грузим и декодируем в скрытом, потом мгновенно меняем местами —
+// без чёрной вспышки между слайдами
+let front = 0, want = 0;
+async function show(n) {
+  want = n;
+  const back = imgs[1 - front];
+  back.src = `/slide/${n}.png`;
+  try { await back.decode(); } catch { return; }
+  if (want !== n) return;  // пока грузили, успели перелистнуть дальше
+  back.classList.add('on');
+  imgs[front].classList.remove('on');
+  front = 1 - front;
   document.title = `Показ — ${n}`;
 }
 let last = '';
@@ -32,7 +43,7 @@ function apply(data) {
   show(data.slide);
   black.style.display = data.black ? 'block' : 'none';
   if (data.count && !cache.done) {
-    for (let i = 1; i <= data.count; i++) (cache[i] = new Image()).src = `/slide/${i}.png`;
+    for (let i = 1; i <= data.count; i++) { (cache[i] = new Image()).src = `/slide/${i}.png`; cache[i].decode().catch(() => {}); }
     cache.done = true;
   }
 }
@@ -42,7 +53,7 @@ async function poll() {
     const raw = await (await fetch('/api/state', {cache: 'no-store'})).text();
     if (raw !== last) { last = raw; apply(JSON.parse(raw)); }
   } catch {}
-  setTimeout(poll, 150);
+  setTimeout(poll, 60);
 }
 poll();
 

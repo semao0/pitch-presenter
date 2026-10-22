@@ -3,7 +3,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 NAME="Pitch Presenter"
-VER=1.3.1
+VER=1.3.2
 ARCH=$(uname -m)
 PY=${PYTHON:-python3}
 

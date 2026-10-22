@@ -23,37 +23,38 @@ const imgs = [document.getElementById('a'), document.getElementById('b')];
 const black = document.getElementById('black');
 const cache = {};
 
-// два кадра: новый слайд грузим и декодируем в скрытом, потом мгновенно меняем местами —
+// два кадра: новый слайд грузим в скрытом, потом мгновенно меняем местами —
 // без чёрной вспышки между слайдами
 let front = 0, want = 0;
 async function show(n) {
   want = n;
   const back = imgs[1 - front];
   back.src = `/slide/${n}.png`;
-  try { await back.decode(); } catch { return; }
+  // ждём onload, а не decode(): событие сети приходит и в перекрытом окне
+  if (!back.complete) await new Promise(r => { back.onload = back.onerror = r; });
   if (want !== n) return;  // пока грузили, успели перелистнуть дальше
   back.classList.add('on');
   imgs[front].classList.remove('on');
   front = 1 - front;
   document.title = `Показ — ${n}`;
 }
-let last = '';
+let ver = 0;
 function apply(data) {
   if (!data.slide) return;
   show(data.slide);
   black.style.display = data.black ? 'block' : 'none';
   if (data.count && !cache.done) {
-    for (let i = 1; i <= data.count; i++) { (cache[i] = new Image()).src = `/slide/${i}.png`; cache[i].decode().catch(() => {}); }
+    for (let i = 1; i <= data.count; i++) (cache[i] = new Image()).src = `/slide/${i}.png`;
     cache.done = true;
   }
 }
-// опрос, а не EventSource: в WebKit на macOS поток событий буферизуется и не доходит
+// long-poll: сервер отвечает, как только слайд сменился; таймеры в фоновом окне не участвуют
 async function poll() {
   try {
-    const raw = await (await fetch('/api/state', {cache: 'no-store'})).text();
-    if (raw !== last) { last = raw; apply(JSON.parse(raw)); }
-  } catch {}
-  setTimeout(poll, 60);
+    const m = await (await fetch('/api/state?v=' + ver, {cache: 'no-store'})).json();
+    if (m.v !== ver) { ver = m.v; if (m.state) apply(m.state); }
+    poll();
+  } catch { setTimeout(poll, 500); }
 }
 poll();
 

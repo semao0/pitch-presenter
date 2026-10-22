@@ -100,6 +100,7 @@ class Api:
         win = webview.create_window("Показ", self._url + "audience", js_api=self, width=1280, height=720,
                                     background_color="#000000")
         win.events.closed += self._audience_closed
+        win.events.shown += lambda: mac_no_throttle(win)
         self._audience = win
 
     def _audience_closed(self):
@@ -113,8 +114,32 @@ class Api:
         if self._audience:
             self._audience.destroy()
         if self._srv:
-            self._srv.bus.closed = True
+            self._srv.bus.close()
             self._srv.shutdown()
+
+
+def mac_no_throttle(win):
+    """macOS глушит перекрытые и фоновые окна: WebKit перестаёт рисовать и душит таймеры,
+    App Nap усыпляет процесс. Для окна показа, которое шарится в созвон, это секунды задержки."""
+    if sys.platform != "darwin":
+        return
+    try:
+        from Foundation import NSProcessInfo
+        from PyObjCTools import AppHelper
+        from webview.platforms.cocoa import BrowserView
+
+        info = NSProcessInfo.processInfo()
+        # NSActivityUserInitiated | NSActivityLatencyCritical — без App Nap, пока приложение открыто
+        mac_no_throttle.activity = info.beginActivityWithOptions_reason_(0x00FFFFFF | 0xFF00000000, "Показ слайдов")
+
+        def tweak():
+            view = BrowserView.instances[win.uid].webview
+            if view.respondsToSelector_("_setWindowOcclusionDetectionEnabled:"):
+                view._setWindowOcclusionDetectionEnabled_(False)
+
+        AppHelper.callAfter(tweak)
+    except Exception as e:  # приватный API может пропасть — показ всё равно работает
+        print("mac_no_throttle:", e, file=sys.stderr)
 
 
 def main():
@@ -125,6 +150,7 @@ def main():
     win = webview.create_window(NAME, html=(WEB / "start.html").read_text(encoding="utf-8"), js_api=api,
                                 width=620, height=460, min_size=(520, 420), background_color="#14161a")
     api._main = win
+    win.events.shown += lambda: mac_no_throttle(win)
     win.events.closed += api._quit
     DATA.mkdir(parents=True, exist_ok=True)
     webview.start(private_mode=False, storage_path=str(DATA / "web"), debug="--debug" in sys.argv)

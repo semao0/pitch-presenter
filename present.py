@@ -238,27 +238,54 @@ def split_time(head: str):
 
 class Bus:
     """Синхронизация окон через сервер: докладчик кладёт состояние, показ — нажатые клавиши.
-    Окна опрашивают сервер раз в ~200 мс — работает в любом WebView (SSE в WebKit на macOS
-    буферизуется и не доходит)."""
+    Long-poll: запрос висит, пока не появится новое, — не зависит ни от таймеров (в фоновом
+    окне их душат до секунд), ни от буферизации потоков (SSE в WebKit на macOS)."""
 
     def __init__(self):
-        self.lock = threading.Lock()
-        self.state = None
-        self.keys = []      # [(seq, key)]
-        self.seq = 0
-        self.seen = 0.0     # когда окно показа последний раз спрашивало состояние
+        self.cond = threading.Condition()
+        self.state, self.ver = None, 0
+        self.keys, self.seq = [], 0   # [(seq, key)]
+        self.waiting = 0              # сколько запросов окна показа сейчас ждут
+        self.seen = 0.0
         self.closed = False
 
+    def close(self):
+        with self.cond:
+            self.closed = True
+            self.cond.notify_all()
+
+    def set_state(self, msg):
+        with self.cond:
+            self.state, self.ver = msg, self.ver + 1
+            self.cond.notify_all()
+
     def push_key(self, key):
-        with self.lock:
+        with self.cond:
             self.seq += 1
             self.keys = [*self.keys[-50:], (self.seq, key)]
+            self.cond.notify_all()
 
-    def keys_since(self, since):
-        with self.lock:
+    def audience(self):
+        return self.waiting > 0 or time.monotonic() - self.seen < 1.5
+
+    def wait_state(self, ver, timeout=5):
+        with self.cond:
+            self.waiting += 1
+            self.cond.notify_all()
+            try:
+                self.cond.wait_for(lambda: self.ver != ver or self.closed, timeout)
+                return self.ver, self.state
+            finally:
+                self.waiting -= 1
+                self.seen = time.monotonic()
+                self.cond.notify_all()
+
+    def wait_keys(self, since, aud, timeout=20):
+        with self.cond:
             if since > self.seq:  # сервер перезапущен — начинаем с нуля
                 since = 0
-            return [k for n, k in self.keys if n > since], self.seq
+            self.cond.wait_for(lambda: self.seq > since or self.audience() != aud or self.closed, timeout)
+            return [k for n, k in self.keys if n > since], self.seq, self.audience()
 
 
 def make_handler(slides, notes_path, args):
@@ -304,13 +331,14 @@ def make_handler(slides, notes_path, args):
                     "warnings": warnings,
                 }
                 return self.send(200, json.dumps(data, ensure_ascii=False).encode(), "application/json")
-            if p == "/api/state":  # окно показа
-                bus.seen = time.monotonic()
-                return self.send(200, json.dumps(bus.state or {}).encode(), "application/json")
-            if p == "/api/poll":  # окно докладчика: новые клавиши и есть ли показ
-                since = int(parse_qs(urlparse(self.path).query).get("since", ["0"])[0] or 0)
-                keys, seq = bus.keys_since(since)
-                data = {"keys": keys, "seq": seq, "audience": time.monotonic() - bus.seen < 1.5}
+            q = parse_qs(urlparse(self.path).query)
+            arg = lambda k: int(q.get(k, ["0"])[0] or 0)  # noqa: E731
+            if p == "/api/state":  # окно показа: ждём, пока состояние сменится
+                ver, state = bus.wait_state(arg("v"))
+                return self.send(200, json.dumps({"v": ver, "state": state}).encode(), "application/json")
+            if p == "/api/poll":  # окно докладчика: ждём клавиши из показа или смену «показ открыт»
+                keys, seq, aud = bus.wait_keys(arg("since"), bool(arg("aud")))
+                data = {"keys": keys, "seq": seq, "audience": aud}
                 return self.send(200, json.dumps(data, ensure_ascii=False).encode(), "application/json")
             m = re.fullmatch(r"/slide/(\d+)\.png", p)
             if m and 1 <= int(m.group(1)) <= len(slides):
@@ -324,7 +352,7 @@ def make_handler(slides, notes_path, args):
             except ValueError:
                 return self.send(400, b"bad json", "text/plain")
             if p == "/api/state":
-                bus.state = msg
+                bus.set_state(msg)
             elif p == "/api/key":
                 bus.push_key(str(msg.get("key", "")))
             else:

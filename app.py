@@ -161,7 +161,7 @@ class StartWindow(Gtk.ApplicationWindow):
         win = PresenterWindow(self.app, f"http://127.0.0.1:{port}/")
 
         def closed(*_):
-            srv.bus.closed = True
+            srv.bus.close()
             threading.Thread(target=srv.shutdown, daemon=True).start()
             srv.server_close()
             self.show()

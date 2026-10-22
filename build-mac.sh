@@ -31,6 +31,10 @@ cp -R "$APP" "$STAGE/"
 ln -s /Applications "$STAGE/Applications"
 DMG="dist/PitchPresenter-$VER-$ARCH.dmg"
 rm -f "$DMG"
-hdiutil create -volname "$NAME" -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null
+for i in 1 2 3 4 5; do  # на CI hdiutil иногда падает с «Resource busy»
+  hdiutil create -volname "$NAME" -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null && break
+  [ "$i" = 5 ] && exit 1
+  sleep 5
+done
 rm -rf "$STAGE"
 echo "Готово: $DMG"

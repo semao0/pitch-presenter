@@ -12,16 +12,16 @@ import argparse
 import hashlib
 import html
 import json
-import queue
 import re
 import shutil
 import subprocess
 import sys
 import threading
+import time
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 CACHE = Path.home() / ".cache" / "pitch-presenter"
 
@@ -237,36 +237,28 @@ def split_time(head: str):
 # ---------- сервер ----------
 
 class Bus:
-    """Синхронизация окон через сервер: докладчик шлёт состояние, показ — нажатые клавиши.
-    Работает в любом браузере/WebView, где окна не делят BroadcastChannel."""
+    """Синхронизация окон через сервер: докладчик кладёт состояние, показ — нажатые клавиши.
+    Окна опрашивают сервер раз в ~200 мс — работает в любом WebView (SSE в WebKit на macOS
+    буферизуется и не доходит)."""
 
     def __init__(self):
         self.lock = threading.Lock()
         self.state = None
-        self.subs = {"audience": [], "presenter": []}
+        self.keys = []      # [(seq, key)]
+        self.seq = 0
+        self.seen = 0.0     # когда окно показа последний раз спрашивало состояние
         self.closed = False
 
-    def publish(self, role, msg):
+    def push_key(self, key):
         with self.lock:
-            for q in self.subs[role]:
-                q.put(msg)
+            self.seq += 1
+            self.keys = [*self.keys[-50:], (self.seq, key)]
 
-    def subscribe(self, role):
-        q = queue.Queue()
+    def keys_since(self, since):
         with self.lock:
-            self.subs[role].append(q)
-            if role == "audience" and self.state:
-                q.put(self.state)
-        self.presence()
-        return q
-
-    def unsubscribe(self, role, q):
-        with self.lock:
-            self.subs[role].remove(q)
-        self.presence()
-
-    def presence(self):
-        self.publish("presenter", {"type": "audience", "n": len(self.subs["audience"])})
+            if since > self.seq:  # сервер перезапущен — начинаем с нуля
+                since = 0
+            return [k for n, k in self.keys if n > since], self.seq
 
 
 def make_handler(slides, notes_path, args):
@@ -312,8 +304,14 @@ def make_handler(slides, notes_path, args):
                     "warnings": warnings,
                 }
                 return self.send(200, json.dumps(data, ensure_ascii=False).encode(), "application/json")
-            if p == "/api/events":
-                return self.events("audience" if "audience" in self.path else "presenter")
+            if p == "/api/state":  # окно показа
+                bus.seen = time.monotonic()
+                return self.send(200, json.dumps(bus.state or {}).encode(), "application/json")
+            if p == "/api/poll":  # окно докладчика: новые клавиши и есть ли показ
+                since = int(parse_qs(urlparse(self.path).query).get("since", ["0"])[0] or 0)
+                keys, seq = bus.keys_since(since)
+                data = {"keys": keys, "seq": seq, "audience": time.monotonic() - bus.seen < 1.5}
+                return self.send(200, json.dumps(data, ensure_ascii=False).encode(), "application/json")
             m = re.fullmatch(r"/slide/(\d+)\.png", p)
             if m and 1 <= int(m.group(1)) <= len(slides):
                 return self.send(200, slides[int(m.group(1)) - 1].read_bytes(), "image/png")
@@ -326,33 +324,12 @@ def make_handler(slides, notes_path, args):
             except ValueError:
                 return self.send(400, b"bad json", "text/plain")
             if p == "/api/state":
-                bus.state = {**msg, "type": "state"}
-                bus.publish("audience", bus.state)
+                bus.state = msg
             elif p == "/api/key":
-                bus.publish("presenter", {"type": "key", "key": str(msg.get("key", ""))})
+                bus.push_key(str(msg.get("key", "")))
             else:
                 return self.send(404, b"not found", "text/plain")
             self.send(200, b"{}", "application/json")
-
-        def events(self, role):
-            """Server-Sent Events; пинг раз в 2 с, чтобы быстро заметить закрытое окно."""
-            self.send_response(200)
-            self.send_header("Content-Type", "text/event-stream")
-            self.send_header("Cache-Control", "no-store")
-            self.end_headers()
-            q = bus.subscribe(role)
-            try:
-                while not bus.closed:
-                    try:
-                        chunk = f"data: {json.dumps(q.get(timeout=2), ensure_ascii=False)}\n\n"
-                    except queue.Empty:
-                        chunk = ": ping\n\n"
-                    self.wfile.write(chunk.encode())
-                    self.wfile.flush()
-            except OSError:
-                pass
-            finally:
-                bus.unsubscribe(role, q)
 
     return H
 

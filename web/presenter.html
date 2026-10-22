@@ -290,12 +290,18 @@ addEventListener('keydown', e => {
   if (handleKey(e.key)) e.preventDefault();
 });
 
-// окно показа шлёт клавиши через сервер, сервер сообщает, сколько окон показа открыто
-new EventSource('/api/events?role=presenter').onmessage = ({data}) => {
-  const m = JSON.parse(data);
-  if (m.type === 'audience') { audience = m.n; tick(); }
-  if (m.type === 'key') handleKey(m.key);
-};
+// окно показа шлёт клавиши через сервер, сервер же говорит, открыто ли оно
+let keySeq = null;
+async function pollBus() {
+  try {
+    const m = await (await fetch('/api/poll?since=' + (keySeq ?? 0))).json();
+    if (keySeq !== null) m.keys.forEach(handleKey);  // старые клавиши при первом запросе не повторяем
+    keySeq = m.seq;
+    if ((m.audience ? 1 : 0) !== audience) { audience = m.audience ? 1 : 0; tick(); }
+  } catch {}
+  setTimeout(pollBus, 150);
+}
+pollBus();
 
 function openAudience() {
   if (window.pywebview) pywebview.api.open_audience();  // Mac/pywebview: window.open там не работает

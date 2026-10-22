@@ -26,16 +26,25 @@ function show(n) {
   img.src = `/slide/${n}.png`;
   document.title = `Показ — ${n}`;
 }
-new EventSource('/api/events?role=audience').onmessage = ({data: raw}) => {
-  const data = JSON.parse(raw);
-  if (data.type !== 'state') return;
+let last = '';
+function apply(data) {
+  if (!data.slide) return;
   show(data.slide);
   black.style.display = data.black ? 'block' : 'none';
   if (data.count && !cache.done) {
     for (let i = 1; i <= data.count; i++) (cache[i] = new Image()).src = `/slide/${i}.png`;
     cache.done = true;
   }
-};
+}
+// опрос, а не EventSource: в WebKit на macOS поток событий буферизуется и не доходит
+async function poll() {
+  try {
+    const raw = await (await fetch('/api/state', {cache: 'no-store'})).text();
+    if (raw !== last) { last = raw; apply(JSON.parse(raw)); }
+  } catch {}
+  setTimeout(poll, 150);
+}
+poll();
 
 // клавиши пересылаем докладчику, чтобы листать с фокусом в любом окне
 addEventListener('keydown', e => {

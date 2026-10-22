@@ -3,7 +3,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 NAME="Pitch Presenter"
-VER=1.3.0
+VER=1.3.1
 ARCH=$(uname -m)
 PY=${PYTHON:-python3}
 
@@ -24,6 +24,8 @@ PL="$APP/Contents/Info.plist"
 plutil -replace CFBundleShortVersionString -string "$VER" "$PL"
 plutil -replace NSHighResolutionCapable -bool true "$PL"
 plutil -replace LSMinimumSystemVersion -string "11.0" "$PL"
+# окна грузят страницы с локального http-сервера — разрешаем это явно
+plutil -replace NSAppTransportSecurity -json '{"NSAllowsLocalNetworking":true,"NSAllowsArbitraryLoadsInWebContent":true}' "$PL"
 codesign --force --deep --sign - "$APP"   # ad-hoc подпись, иначе на Apple Silicon не запустится
 
 STAGE=$(mktemp -d)

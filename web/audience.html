@@ -17,7 +17,7 @@
 <body>
 <img id="a" alt=""><img id="b" alt="">
 <div id="black"></div>
-<div id="hint">Двойной клик — полный экран · стрелки листают</div>
+<div id="hint">Клик — вперёд · правый клик — назад · двойной клик — полный экран</div>
 <script>
 const imgs = [document.getElementById('a'), document.getElementById('b')];
 const black = document.getElementById('black');
@@ -61,11 +61,21 @@ async function poll() {
 poll();
 
 // клавиши пересылаем докладчику, чтобы листать с фокусом в любом окне
+const send = key => fetch('/api/key', {method: 'POST', body: JSON.stringify({key})}).catch(() => {});
 addEventListener('keydown', e => {
   if (e.key === 'f' || e.key === 'F') { toggleFs(); return; }
-  fetch('/api/key', {method: 'POST', body: JSON.stringify({key: e.key})}).catch(() => {});
+  send(e.key);
   e.preventDefault();
 });
+// левая кнопка — вперёд, правая — назад; клик чуть придерживаем, чтобы двойной клик
+// (полный экран) не перелистывал два слайда
+let clickT;
+addEventListener('click', e => {
+  if (e.button !== 0) return;
+  clearTimeout(clickT);
+  if (e.detail === 1) clickT = setTimeout(() => send('ArrowRight'), 250);
+});
+addEventListener('contextmenu', e => { e.preventDefault(); send('ArrowLeft'); });
 function toggleFs() {
   if (window.pywebview) return pywebview.api.fullscreen();
   document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();

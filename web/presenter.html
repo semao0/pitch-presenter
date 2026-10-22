@@ -129,8 +129,8 @@
 <div class="overlay" id="goto"><div id="goto-box"></div></div>
 <div class="overlay" id="help">
   <div id="help-box">
-    <span><kbd>→</kbd><kbd>Space</kbd><kbd>PgDn</kbd></span><span>вперёд</span>
-    <span><kbd>←</kbd><kbd>PgUp</kbd></span><span>назад</span>
+    <span><kbd>→</kbd><kbd>Space</kbd><kbd>PgDn</kbd></span><span>вперёд · клик по слайду</span>
+    <span><kbd>←</kbd><kbd>PgUp</kbd></span><span>назад · правый клик</span>
     <span><kbd>↑</kbd><kbd>↓</kbd></span><span>прокрутить текст</span>
     <span><kbd>12</kbd><kbd>Enter</kbd></span><span>перейти к слайду</span>
     <span><kbd>B</kbd></span><span>скрыть экран</span>
@@ -292,6 +292,9 @@ addEventListener('keydown', e => {
   if (e.ctrlKey || e.altKey || e.metaKey) return;
   if (handleKey(e.key)) e.preventDefault();
 });
+// мышь по слайдам: левая кнопка — вперёд, правая — назад
+document.querySelector('.slides').addEventListener('click', e => { if (e.button === 0) handleKey('ArrowRight'); });
+document.querySelector('.slides').addEventListener('contextmenu', e => { e.preventDefault(); handleKey('ArrowLeft'); });
 
 // окно показа шлёт клавиши через сервер, сервер же говорит, открыто ли оно
 let keySeq = null;

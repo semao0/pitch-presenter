@@ -26,10 +26,11 @@ const cache = {};
 // два кадра: новый слайд грузим в скрытом, потом мгновенно меняем местами —
 // без чёрной вспышки между слайдами
 let front = 0, want = 0;
+let deckId = '';
 async function show(n) {
   want = n;
   const back = imgs[1 - front];
-  back.src = `/slide/${n}.png`;
+  back.src = `/slide/${n}.png?d=${deckId}`;
   // ждём onload, а не decode(): событие сети приходит и в перекрытом окне
   if (!back.complete) await new Promise(r => { back.onload = back.onerror = r; });
   if (want !== n) return;  // пока грузили, успели перелистнуть дальше
@@ -41,10 +42,11 @@ async function show(n) {
 let ver = 0;
 function apply(data) {
   if (!data.slide) return;
+  deckId = data.deck || '';
   show(data.slide);
   black.style.display = data.black ? 'block' : 'none';
   if (data.count && !cache.done) {
-    for (let i = 1; i <= data.count; i++) (cache[i] = new Image()).src = `/slide/${i}.png`;
+    for (let i = 1; i <= data.count; i++) (cache[i] = new Image()).src = `/slide/${i}.png?d=${deckId}`;
     cache.done = true;
   }
 }

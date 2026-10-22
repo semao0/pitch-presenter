@@ -158,7 +158,10 @@ let budget = [], planEnd = [], lastTick = Date.now();
 let gotoBuf = '', gotoTimer, audience = 0;
 
 const post = (url, data) => fetch(url, {method: 'POST', body: JSON.stringify(data)}).catch(() => {});
-function broadcast() { post('/api/state', {slide, black, count: deck.count}); }
+function broadcast() { post('/api/state', {slide, black, count: deck.count, deck: deck.id}); }
+// адрес слайда с id колоды: WebKit кэширует картинки на диске, и без него после смены презы
+// по тому же /slide/1.png показывалась старая
+const slideUrl = n => `/slide/${n}.png?d=${deck.id}`;
 
 function render() {
   const n = deck.count;
@@ -166,10 +169,10 @@ function render() {
   store.set('slide', slide);
   $('pos').innerHTML = `${slide}<span> / ${n}</span>`;
   $('progress').style.width = n ? `${slide / n * 100}%` : 0;
-  $('cur').src = `/slide/${slide}.png`;
+  $('cur').src = slideUrl(slide);
   $('cur-shot').classList.toggle('black', black);
   $('next-shot').classList.toggle('end', slide >= n);
-  if (slide < n) $('next').src = `/slide/${slide + 1}.png`;
+  if (slide < n) $('next').src = slideUrl(slide + 1);
   $('next-label').textContent = slide < n ? 'Далее' : 'Конец';
   slideTime(elapsed());
   const note = deck.notes[slide];
@@ -333,7 +336,7 @@ async function poll() {
   } catch {}
 }
 setFont(fontSize);
-load().then(() => { for (let i = 1; i <= deck.count; i++) new Image().src = `/slide/${i}.png`; });
+load().then(() => { for (let i = 1; i <= deck.count; i++) new Image().src = slideUrl(i); });
 setInterval(poll, 1500); poll();
 </script>
 </body>

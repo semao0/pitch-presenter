@@ -327,6 +327,7 @@ def make_handler(slides, notes_path, args):
                     "title": meta.get("title", args.deck.stem),
                     "minutes": float(meta.get("minutes", args.minutes or 0) or 0),
                     "count": len(slides),
+                    "id": slides[0].parent.name,  # ключ рендера: другой файл — другие адреса слайдов
                     "notes": {str(k): v for k, v in notes.items()},
                     "warnings": warnings,
                 }

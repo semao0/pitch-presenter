@@ -5,6 +5,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import { error as logError } from '@tauri-apps/plugin-log';
 import { mount } from 'svelte';
 import { AUDIENCE_WINDOW } from './lib/api';
+import { settings } from './lib/settings.svelte';
 import App from './App.svelte';
 import Audience from './views/Audience.svelte';
 
@@ -21,6 +22,9 @@ if (!import.meta.env.DEV) {
 // reports have the full picture.
 window.addEventListener('error', (e) => void logError(`${e.message} at ${e.filename}:${e.lineno}`));
 window.addEventListener('unhandledrejection', (e) => void logError(`unhandled rejection: ${String(e.reason)}`));
+
+// Set before the first paint so a dark-theme launch doesn't flash light.
+document.documentElement.dataset.theme = settings.theme;
 
 const target = document.getElementById('app')!;
 export default mount(isAudience ? Audience : App, { target });

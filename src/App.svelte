@@ -2,7 +2,9 @@
 <script lang="ts">
   import { getCurrentWindow } from '@tauri-apps/api/window';
   import { onMount } from 'svelte';
+  import { invoke } from '@tauri-apps/api/core';
   import { api, events } from './lib/api';
+  import { settings } from './lib/settings.svelte';
   import type { Deck } from './lib/types';
   import Presenter from './views/Presenter.svelte';
   import Start from './views/Start.svelte';
@@ -31,6 +33,17 @@
     deck = null;
     void getCurrentWindow().unmaximize();
   }
+
+  // Theme lives on <html> so overlays and the page background follow it.
+  $effect(() => {
+    document.documentElement.dataset.theme = settings.theme;
+  });
+
+  // Backend messages (errors, notes warnings) follow the UI language.
+  $effect(() => {
+    document.documentElement.lang = settings.lang;
+    void invoke('set_language', { english: settings.lang === 'en' });
+  });
 
   $effect(() => {
     if (!deck) void getCurrentWindow().setTitle('Pitch Presenter');

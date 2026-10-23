@@ -13,7 +13,8 @@ export type Block =
   | { kind: 'cue'; content: Inline[] };
 
 export interface SlideNote {
-  title: string;
+  /** Caption; absent means "Slide N". */
+  title: string | null;
   blocks: Block[];
   /** Spoken words, used to split the talk time between slides. */
   words: number;

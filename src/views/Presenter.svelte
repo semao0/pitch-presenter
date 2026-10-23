@@ -6,9 +6,12 @@
   import Icon from '../components/Icon.svelte';
   import NoteBody from '../components/NoteBody.svelte';
   import Overview from '../components/Overview.svelte';
+  import Preferences from '../components/Preferences.svelte';
   import { api, events, slideUrl } from '../lib/api';
   import { computePlan, formatDuration, pace } from '../lib/plan';
   import { SlidePreloader } from '../lib/preload';
+  import { shortcutKey } from '../lib/keys';
+  import { settings, t } from '../lib/settings.svelte';
   import { prefs } from '../lib/storage';
   import { TalkTimer } from '../lib/timer.svelte';
   import type { Deck, Nav, ViewState } from '../lib/types';
@@ -45,7 +48,7 @@
   const spentHere = $derived(timer.spentOn(view.slide));
   const remaining = $derived(deck.minutes > 0 ? deck.minutes * 60_000 - timer.elapsed : null);
   const currentPace = $derived(timer.pristine ? null : pace(plan, view.slide, timer.elapsed, spentHere));
-  const clock = $derived(new Date(timer.now).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' }));
+  const clock = $derived(new Date(timer.now).toLocaleTimeString(settings.lang, { hour: '2-digit', minute: '2-digit' }));
   const warnings = $derived(deck.notes.warnings);
 
   // Slide sizes follow the stage box. Measured with a ResizeObserver (via
@@ -224,7 +227,7 @@
 
   function onkeydown(e: KeyboardEvent) {
     if (e.ctrlKey || e.altKey || e.metaKey) return;
-    if (handleKey(e.key)) e.preventDefault();
+    if (handleKey(shortcutKey(e))) e.preventDefault();
   }
 
   // ---- layout ------------------------------------------------------------------
@@ -296,7 +299,7 @@
 
 <div class="presenter" style:--note-size="{fontSize}px" style:--aspect={deck.aspect}>
   <header>
-    <div class="position tabular" title="Слайд">
+    <div class="position tabular" title={t('presenter.position')}>
       {view.slide}<span>/ {deck.count}</span>
     </div>
     <div class="title">
@@ -306,20 +309,21 @@
 
     {#if warnings.length > 0}
       <div class="warnings">
-        <button class="icon-btn warn" onclick={() => (showWarnings = !showWarnings)} title="Предупреждения">
+        <button class="icon-btn warn" onclick={() => (showWarnings = !showWarnings)} title={t('presenter.warnings')}>
           <Icon name="warning" />
           <span class="tabular">{warnings.length}</span>
         </button>
         {#if showWarnings}
-          <ul class="popover" aria-label="Предупреждения">
+          <ul class="popover" aria-label={t('presenter.warnings')}>
             {#each warnings as warning (warning)}<li>{warning}</li>{/each}
           </ul>
         {/if}
       </div>
     {/if}
 
-    <button class="timer tabular" onclick={() => timer.toggle()} title="Таймер: старт / пауза — T, сброс — Shift R">
-      <span class="elapsed" class:paused={!timer.running}>{formatDuration(timer.elapsed)}</span>
+    <button class="timer tabular" class:running={timer.running} onclick={() => timer.toggle()} title={t('presenter.timer')}>
+      <span class="dot"></span>
+      <span class="elapsed">{formatDuration(timer.elapsed)}</span>
       {#if remaining !== null}
         <span class="remaining" class:warn={remaining >= 0 && remaining < 60_000} class:bad={remaining < 0}>
           {remaining >= 0 ? '−' : '+'}{formatDuration(remaining)}
@@ -328,26 +332,27 @@
     </button>
 
     {#if currentPace}
-      <span class="pace tabular {currentPace.status}" title="Темп относительно плана">
-        {#if currentPace.status === 'onTime'}по плану
-        {:else if currentPace.status === 'ahead'}запас {formatDuration(currentPace.diff)}
-        {:else}отстаём {formatDuration(currentPace.diff)}{/if}
+      <span class="pace tabular {currentPace.status}" title={t('presenter.pace')}>
+        {#if currentPace.status === 'onTime'}{t('presenter.pace.onTime')}
+        {:else if currentPace.status === 'ahead'}{t('presenter.pace.ahead', { time: formatDuration(currentPace.diff) })}
+        {:else}{t('presenter.pace.behind', { time: formatDuration(currentPace.diff) })}{/if}
       </span>
     {/if}
 
-    <span class="clock tabular" title="Текущее время">{clock}</span>
+    <span class="clock tabular" title={t('presenter.clock')}>{clock}</span>
 
-    <button class="audience" class:on={audienceOpen} onclick={() => api.openAudience()} title="Окно для показа — A">
-      <i></i>{audienceOpen ? 'Показ открыт' : 'Показ'}
+    <button class="audience" class:on={audienceOpen} onclick={() => api.openAudience()} title={t('presenter.audience.tip')}>
+      <span class="dot"></span>{audienceOpen ? t('presenter.audience.on') : t('presenter.audience')}
     </button>
     <div class="tools">
-      <button class="icon-btn" onclick={() => (overview = { selected: view.slide })} title="Все слайды — G">
+      <button class="icon-btn" onclick={() => (overview = { selected: view.slide })} title={t('presenter.overview')}>
         <Icon name="grid" />
       </button>
-      <button class="icon-btn" onclick={() => (showHelp = true)} title="Клавиши — ?">
+      <button class="icon-btn" onclick={() => (showHelp = true)} title={t('presenter.help')}>
         <Icon name="help" />
       </button>
-      <button class="icon-btn" onclick={close} title="Закрыть презентацию">
+      <Preferences language={false} />
+      <button class="icon-btn" onclick={close} title={t('presenter.close')}>
         <Icon name="exit" />
       </button>
     </div>
@@ -357,12 +362,12 @@
   {#if deck.notesError}
     <div class="banner" role="alert">
       <Icon name="warning" size={16} />
-      <span><b>Текст не обновлён.</b> {deck.notesError}</span>
+      <span><b>{t('presenter.notesError')}</b> {deck.notesError}</span>
     </div>
   {/if}
 
   <main style:--split="{split}%">
-    <section class="stage" aria-label="Слайды" bind:clientWidth={stageWidth} bind:clientHeight={stageHeight}>
+    <section class="stage" aria-label={t('overview.label')} bind:clientWidth={stageWidth} bind:clientHeight={stageHeight}>
       <button
         class="current"
         class:blank={view.blank}
@@ -372,10 +377,10 @@
           e.preventDefault();
           go(view.slide - 1);
         }}
-        aria-label="Следующий слайд"
+        aria-label={t('presenter.next')}
       >
-        <img src={slideUrl(deck.id, view.slide)} alt="Слайд {view.slide}" draggable="false" />
-        {#if view.blank}<span class="badge">Экран скрыт · B</span>{/if}
+        <img src={slideUrl(deck.id, view.slide)} alt={t('presenter.slide', { n: view.slide })} draggable="false" />
+        {#if view.blank}<span class="badge"><span class="dot"></span>{t('presenter.blank')}</span>{/if}
       </button>
 
       <div
@@ -384,19 +389,19 @@
         class:hidden={!budget}
         class:warn={spentHere > budget * 0.8 && spentHere <= budget}
         class:over={spentHere > budget}
-        title="Время на этом слайде / по плану"
+        title={t('presenter.slideTime')}
       >
         <div class="track"><div class="fill" style:width="{Math.min(100, (spentHere / budget) * 100 || 0)}%"></div></div>
         <span>
           {spentHere > budget
-            ? `+${formatDuration(spentHere - budget)} сверх ${formatDuration(budget)}`
+            ? t('presenter.over', { over: formatDuration(spentHere - budget), budget: formatDuration(budget) })
             : `${formatDuration(spentHere)} / ${formatDuration(budget)}`}
         </span>
       </div>
 
-      <div class="next-label">{isLast ? 'Конец презентации' : 'Далее'}</div>
+      <div class="next-label label">{isLast ? t('presenter.end') : t('presenter.upNext')}</div>
       {#if !isLast}
-        <button class="next" style:width="{nextWidth}px" onclick={() => go(view.slide + 1)} aria-label="Перейти к следующему слайду">
+        <button class="next" style:width="{nextWidth}px" onclick={() => go(view.slide + 1)} aria-label={t('presenter.next')}>
           <img src={slideUrl(deck.id, view.slide + 1)} alt="" draggable="false" />
         </button>
       {/if}
@@ -412,25 +417,27 @@
         split = 58;
         prefs.set('split', split);
       }}
-      title="Перетащите, чтобы изменить ширину · двойной клик — сбросить"
+      title={t('presenter.split')}
     ></div>
 
-    <section class="notes thin-scroll" bind:this={notesEl} aria-label="Текст спикера">
+    <section class="notes thin-scroll" bind:this={notesEl} aria-label={t('presenter.notes')}>
       <div class="note-title">
-        {note?.title ?? `Слайд ${view.slide}`}
-        {#if note?.reserve}<span class="reserve">резерв</span>{/if}
+        <span class="label">{note?.title ?? t('presenter.slide', { n: view.slide })}</span>
+        {#if note?.reserve}<span class="reserve">{t('presenter.reserve')}</span>{/if}
         {#if note?.seconds}<span class="limit tabular"><Icon name="clock" size={13} />{formatDuration(note.seconds * 1000)}</span>{/if}
       </div>
       <NoteBody blocks={note?.blocks ?? []} />
       {#if !isLast}
-        <div class="upnext">Дальше — {nextNote?.title ?? `слайд ${view.slide + 1}`}</div>
+        <div class="upnext">
+          {t('presenter.then', { title: nextNote?.title ?? t('presenter.slideLower', { n: view.slide + 1 }) })}
+        </div>
       {/if}
     </section>
   </main>
 
   {#if gotoBuffer}
     <div class="goto tabular" aria-live="polite">
-      <span>{gotoBuffer}</span><small>Enter — перейти</small>
+      <span>{gotoBuffer}</span><small>{t('presenter.goto')}</small>
     </div>
   {/if}
   {#if overview}
@@ -462,14 +469,15 @@
     display: flex;
     align-items: center;
     gap: 22px;
-    padding: 12px 18px 12px 26px;
-    border-bottom: 2px solid var(--line);
+    padding: 10px 16px 10px 26px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--line);
   }
 
   .progress {
     position: absolute;
     left: 0;
-    bottom: -2px;
+    bottom: -1px;
     height: 2px;
     background: var(--accent);
     transition: width 0.25s var(--ease);
@@ -477,8 +485,8 @@
 
   .position {
     font-size: 22px;
-    font-weight: 650;
-    letter-spacing: 0.01em;
+    font-weight: 700;
+    letter-spacing: -0.01em;
   }
 
   .position span {
@@ -514,9 +522,8 @@
   }
 
   .icon-btn.warn {
-    width: auto;
     gap: 6px;
-    padding: 0 8px;
+    padding: 0 10px;
     color: var(--warn);
     display: inline-flex;
     align-items: center;
@@ -543,22 +550,34 @@
 
   .timer {
     display: flex;
-    align-items: baseline;
-    gap: 10px;
-    padding: 4px 8px;
-    border-radius: var(--radius-s);
+    align-items: center;
+    gap: 9px;
+    padding: 4px 10px;
+    border-radius: 999px;
   }
 
   .timer:hover {
     background: var(--surface-2);
   }
 
-  .elapsed {
-    font-size: 26px;
-    font-weight: 650;
+  /* The red dot is on while the clock runs, like a recording light. */
+  .timer .dot {
+    background: var(--fg-4);
+    transition: background 0.2s;
   }
 
-  .elapsed.paused {
+  .timer.running .dot {
+    background: var(--accent);
+    animation: on-air 2s ease-in-out infinite;
+  }
+
+  .elapsed {
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  .timer:not(.running) .elapsed {
     color: var(--fg-4);
   }
 
@@ -604,34 +623,42 @@
     height: 32px;
     padding: 0 14px;
     font-size: 14px;
+    font-weight: 500;
     border-radius: 999px;
-    background: var(--surface-2);
-    border: 1px solid var(--line);
+    border: 1px solid var(--line-strong);
     white-space: nowrap;
-    transition: border-color 0.15s;
+    transition:
+      border-color 0.15s,
+      background 0.15s;
   }
 
   .audience:hover {
-    border-color: var(--line-strong);
+    border-color: var(--fg-3);
   }
 
-  .audience i {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
+  .audience .dot {
     background: var(--fg-4);
-    transition:
-      background 0.2s,
-      box-shadow 0.2s;
   }
 
-  .audience.on i {
-    background: var(--ok);
-    box-shadow: 0 0 0 3px rgb(76 195 138 / 20%);
+  .audience.on {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+
+  .audience.on .dot {
+    background: var(--accent);
+    animation: on-air 2s ease-in-out infinite;
+  }
+
+  @keyframes on-air {
+    50% {
+      opacity: 0.35;
+    }
   }
 
   .tools {
     display: flex;
+    align-items: center;
     gap: 2px;
   }
 
@@ -648,7 +675,7 @@
   }
 
   .banner b {
-    font-weight: 600;
+    font-weight: 650;
   }
 
   /* ---- workspace ---- */
@@ -656,7 +683,7 @@
   main {
     flex: 1;
     display: grid;
-    grid-template-columns: var(--split) 10px minmax(0, 1fr);
+    grid-template-columns: var(--split) 12px minmax(0, 1fr);
     min-height: 0;
   }
 
@@ -677,15 +704,16 @@
     border-radius: var(--radius-s);
     overflow: hidden;
     background: var(--surface);
+    box-shadow: var(--slide-shadow);
   }
 
   .next {
-    opacity: 0.6;
+    opacity: 0.8;
     transition: opacity 0.15s;
   }
 
   .next:hover {
-    opacity: 0.85;
+    opacity: 1;
   }
 
   /* Big click targets: a focus ring around the slide would only distract. */
@@ -703,27 +731,34 @@
   }
 
   .current.blank img {
-    opacity: 0.15;
+    opacity: 0.12;
+  }
+
+  .current.blank {
+    background: #000;
   }
 
   .badge {
     position: absolute;
     left: 14px;
     top: 12px;
-    padding: 4px 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 12px;
     border-radius: 999px;
-    background: var(--warn-soft);
-    color: var(--warn);
+    background: #fff;
+    color: #16181c;
     font-size: 13px;
-    font-weight: 500;
+    font-weight: 550;
   }
 
   .slide-time {
     display: flex;
     align-items: center;
     gap: 14px;
-    margin-top: 12px;
-    font-size: 14px;
+    margin-top: 14px;
+    font-size: 13px;
     color: var(--fg-3);
   }
 
@@ -733,16 +768,16 @@
 
   .track {
     flex: 1;
-    height: 6px;
-    border-radius: 3px;
+    height: 4px;
+    border-radius: 2px;
     background: var(--line);
     overflow: hidden;
   }
 
   .fill {
     height: 100%;
-    border-radius: 3px;
-    background: var(--accent);
+    border-radius: 2px;
+    background: var(--fg);
     transition:
       width 0.25s linear,
       background 0.3s;
@@ -762,26 +797,15 @@
 
   .slide-time.over span {
     color: var(--bad);
-    font-weight: 600;
+    font-weight: 650;
   }
 
   .slide-time.over .track {
-    animation: pulse 1.2s ease-in-out infinite;
-  }
-
-  @keyframes pulse {
-    50% {
-      opacity: 0.45;
-    }
+    animation: on-air 1.2s ease-in-out infinite;
   }
 
   .next-label {
-    margin: 20px 0 8px;
-    font-size: 12px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--fg-4);
+    margin: 22px 0 10px;
   }
 
   .splitter {
@@ -795,42 +819,40 @@
     position: absolute;
     top: 22px;
     bottom: 22px;
-    left: 4px;
-    width: 2px;
-    border-radius: 1px;
-    background: transparent;
-    transition: background 0.15s;
+    left: 5px;
+    width: 1px;
+    background: var(--line);
+    transition:
+      background 0.15s,
+      width 0.15s;
   }
 
   .splitter:hover::after {
-    background: var(--line-strong);
+    width: 2px;
+    background: var(--fg-3);
   }
 
   .notes {
     overflow-y: auto;
     min-height: 0;
     /* Room to scroll the last lines up to eye level. */
-    padding: 22px 40px 40vh 30px;
+    padding: 24px 40px 40vh 30px;
   }
 
   .note-title {
     display: flex;
     align-items: center;
     gap: 10px;
-    margin: 2px 0 18px;
-    font-size: 15px;
-    font-weight: 550;
-    color: var(--accent);
-    letter-spacing: 0.01em;
+    margin: 4px 0 18px;
   }
 
   .reserve {
-    padding: 2px 8px;
+    padding: 1px 8px;
     border-radius: 999px;
-    background: var(--warn-soft);
+    border: 1px solid var(--warn);
     color: var(--warn);
-    font-size: 12px;
-    font-weight: 500;
+    font-size: 11px;
+    font-weight: 550;
   }
 
   .limit {
@@ -838,13 +860,15 @@
     align-items: center;
     gap: 4px;
     color: var(--fg-3);
-    font-size: 13px;
-    font-weight: 400;
+    font-size: 12px;
   }
 
   .upnext {
     margin-top: 28px;
-    font-size: 15px;
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+    max-width: 42ch;
+    font-size: 14px;
     color: var(--fg-3);
   }
 
@@ -858,13 +882,14 @@
     place-content: center;
     justify-items: center;
     gap: 6px;
-    background: rgb(6 7 9 / 60%);
+    background: var(--backdrop);
     pointer-events: none;
   }
 
   .goto span {
-    font-size: 72px;
-    font-weight: 650;
+    font-size: 88px;
+    font-weight: 700;
+    letter-spacing: -0.03em;
   }
 
   .goto small {

@@ -25,6 +25,7 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 
 use crate::error::{Error, Result};
+use crate::i18n::tr;
 use markup::Block;
 
 /// Parsed notes, ready for the frontend.
@@ -42,7 +43,8 @@ pub struct Notes {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SlideNote {
-    pub title: String,
+    /// Caption; the frontend shows "Slide N" when absent.
+    pub title: Option<String>,
     pub blocks: Vec<Block>,
     /// Spoken words, used to split the talk time between slides.
     pub words: u32,
@@ -116,7 +118,10 @@ pub fn load(path: &Path, slide_count: u32) -> Result<Notes> {
 fn parse(source: &str, slide_count: u32) -> std::result::Result<Notes, String> {
     let file: NotesFile = toml::from_str(source).map_err(|e| describe(&e, source))?;
     if file.minutes.is_some_and(|m| !m.is_finite() || m < 0.0) {
-        return Err("minutes: длительность должна быть неотрицательным числом".into());
+        return Err(tr!(
+            "minutes: длительность должна быть неотрицательным числом",
+            "minutes: the duration must be a non-negative number"
+        ));
     }
 
     let mut notes = Notes {
@@ -125,28 +130,34 @@ fn parse(source: &str, slide_count: u32) -> std::result::Result<Notes, String> {
         ..Notes::default()
     };
     for (i, entry) in file.slide.into_iter().enumerate() {
-        let at = format!("[[slide]] №{}", i + 1);
+        let at = format!("[[slide]] #{}", i + 1);
         if entry.n == 0 {
-            return Err(format!("{at}: слайды нумеруются с 1"));
+            return Err(tr!(
+                "{at}: слайды нумеруются с 1",
+                "{at}: slides are numbered from 1"
+            ));
         }
         let seconds = match &entry.time {
             None => None,
-            Some(t) => Some(
-                t.seconds()
-                    .ok_or_else(|| format!("{at}: время пишется как 45, \"45s\" или \"0:45\""))?,
-            ),
+            Some(t) => Some(t.seconds().ok_or_else(|| {
+                tr!(
+                    "{at}: время пишется как 45, \"45s\" или \"0:45\"",
+                    "{at}: write time as 45, \"45s\" or \"0:45\""
+                )
+            })?),
         };
         let note = SlideNote {
-            title: entry.title.unwrap_or_else(|| format!("Слайд {}", entry.n)),
+            title: entry.title,
             blocks: markup::parse_blocks(&entry.text),
             words: markup::spoken_words(&entry.text),
             seconds,
             reserve: entry.reserve,
         };
         if notes.slides.insert(entry.n, note).is_some() {
-            notes.warnings.push(format!(
-                "Слайд {}: текст указан дважды, взят последний",
-                entry.n
+            let n = entry.n;
+            notes.warnings.push(tr!(
+                "Слайд {n}: текст указан дважды, взят последний",
+                "Slide {n}: notes are given twice, the last ones are used"
             ));
         }
     }
@@ -158,9 +169,10 @@ fn parse(source: &str, slide_count: u32) -> std::result::Result<Notes, String> {
         .map(u32::to_string)
         .collect();
     if !orphans.is_empty() {
-        notes.warnings.push(format!(
-            "В презентации {slide_count} слайдов, а текст есть для: {}",
-            orphans.join(", ")
+        let orphans = orphans.join(", ");
+        notes.warnings.push(tr!(
+            "В презентации {slide_count} слайдов, а текст есть для: {orphans}",
+            "The deck has {slide_count} slides, but there are notes for: {orphans}"
         ));
     }
     Ok(notes)
@@ -173,7 +185,7 @@ fn describe(e: &toml::de::Error, source: &str) -> String {
     match e.span() {
         Some(span) => {
             let line = source[..span.start.min(source.len())].matches('\n').count() + 1;
-            format!("строка {line}: {message}")
+            tr!("строка {line}: {message}", "line {line}: {message}")
         }
         None => message.to_owned(),
     }
@@ -212,15 +224,15 @@ mod tests {
 
         let first = &notes.slides[&1];
         assert_eq!(
-            (first.title.as_str(), first.seconds, first.words),
-            ("Боль", Some(30), 6)
+            (first.title.as_deref(), first.seconds, first.words),
+            (Some("Боль"), Some(30), 6)
         );
         assert_eq!(first.blocks.len(), 2);
 
         let third = &notes.slides[&3];
         assert_eq!(
-            (third.title.as_str(), third.seconds, third.reserve),
-            ("Слайд 3", Some(20), true)
+            (third.title.as_deref(), third.seconds, third.reserve),
+            (None, Some(20), true)
         );
     }
 
@@ -281,6 +293,14 @@ mod tests {
         )
         .unwrap_err();
         assert!(err.starts_with("строка 5: unknown field `tiem`"), "{err}");
+    }
+
+    #[test]
+    fn messages_follow_the_language() {
+        crate::i18n::set_english(true);
+        let err = parse("[[slide]]\nn = 0\ntext = \"x\"", 1).unwrap_err();
+        crate::i18n::set_english(false);
+        assert_eq!(err, "[[slide]] #1: slides are numbered from 1");
     }
 
     #[test]

@@ -1,43 +1,29 @@
-//! Application error type. Messages are user-facing (Russian) because they are
-//! shown as-is in the UI.
+//! Application error type. Messages are user-facing and follow the UI language.
 
+use std::fmt;
 use std::path::Path;
 
 use serde::{Serialize, Serializer};
 
-#[derive(Debug, thiserror::Error)]
+use crate::i18n::tr;
+
+#[derive(Debug)]
 pub enum Error {
-    #[error("{path}: {source}")]
     Io {
         path: String,
         source: std::io::Error,
     },
-
-    #[error("Ошибка в {file}: {message}")]
-    Notes { file: String, message: String },
-
-    #[error("Не удалось открыть PDF: {0}")]
+    Notes {
+        file: String,
+        message: String,
+    },
     Pdf(String),
-
-    #[error(
-        "Для PPTX, PPT, ODP и Key нужен LibreOffice. Установите его или экспортируйте презентацию в PDF."
-    )]
     NoLibreOffice,
-
-    #[error("LibreOffice не смог сконвертировать презентацию: {0}")]
     Conversion(String),
-
-    #[error("Не найдена библиотека PDFium. Переустановите приложение.")]
     NoPdfium,
-
-    #[error("В презентации нет слайдов")]
     EmptyDeck,
-
-    #[error("Сначала откройте презентацию")]
     NoSession,
-
-    #[error(transparent)]
-    Tauri(#[from] tauri::Error),
+    Tauri(tauri::Error),
 }
 
 impl Error {
@@ -46,6 +32,53 @@ impl Error {
             path: path.display().to_string(),
             source,
         }
+    }
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let message = match self {
+            Self::Io { path, source } => format!("{path}: {source}"),
+            Self::Notes { file, message } => {
+                tr!("Ошибка в {file}: {message}", "Error in {file}: {message}")
+            }
+            Self::Pdf(e) => tr!("Не удалось открыть PDF: {e}", "Cannot open the PDF: {e}"),
+            Self::NoLibreOffice => tr!(
+                "Для PPTX, PPT, ODP и Key нужен LibreOffice. Установите его или экспортируйте презентацию в PDF.",
+                "PPTX, PPT, ODP and Key need LibreOffice. Install it or export the presentation to PDF."
+            ),
+            Self::Conversion(e) => tr!(
+                "LibreOffice не смог сконвертировать презентацию: {e}",
+                "LibreOffice could not convert the presentation: {e}"
+            ),
+            Self::NoPdfium => tr!(
+                "Не найдена библиотека PDFium. Переустановите приложение.",
+                "The PDFium library is missing. Please reinstall the app."
+            ),
+            Self::EmptyDeck => tr!(
+                "В презентации нет слайдов",
+                "The presentation has no slides"
+            ),
+            Self::NoSession => tr!("Сначала откройте презентацию", "Open a presentation first"),
+            Self::Tauri(e) => e.to_string(),
+        };
+        f.write_str(&message)
+    }
+}
+
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Io { source, .. } => Some(source),
+            Self::Tauri(e) => Some(e),
+            _ => None,
+        }
+    }
+}
+
+impl From<tauri::Error> for Error {
+    fn from(e: tauri::Error) -> Self {
+        Self::Tauri(e)
     }
 }
 

@@ -12,6 +12,7 @@
 mod commands;
 mod config;
 mod error;
+mod i18n;
 mod notes;
 mod render;
 mod session;
@@ -69,6 +70,7 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            commands::set_language,
             commands::launch_info,
             commands::classify_files,
             commands::guess_notes,

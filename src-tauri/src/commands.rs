@@ -27,6 +27,12 @@ pub struct LaunchInfo {
     pub recent: Vec<RecentDeck>,
 }
 
+/// Sets the language of backend messages (errors, notes warnings).
+#[tauri::command]
+pub fn set_language(english: bool) {
+    crate::i18n::set_english(english);
+}
+
 /// Files from the command line win; otherwise the last opened deck.
 #[tauri::command]
 pub fn launch_info(state: State<'_, AppState>) -> LaunchInfo {

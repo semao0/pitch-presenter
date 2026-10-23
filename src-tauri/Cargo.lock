@@ -2651,7 +2651,6 @@ dependencies = [
  "tauri-plugin-dialog",
  "tauri-plugin-log",
  "tauri-plugin-single-instance",
- "thiserror 2.0.21",
  "toml 1.1.8+spec-1.1.0",
 ]
 

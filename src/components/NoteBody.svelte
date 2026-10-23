@@ -1,5 +1,6 @@
 <!-- Speaker note text: paragraphs, bullet lists and cues (remarks to self). -->
 <script lang="ts">
+  import { t } from '../lib/settings.svelte';
   import type { Block } from '../lib/types';
   import Inlines from './Inlines.svelte';
 
@@ -20,21 +21,22 @@
       <p class="cue"><Inlines nodes={block.content} /></p>
     {/if}
   {:else}
-    <p class="empty">Без текста</p>
+    <p class="empty">{t('presenter.noText')}</p>
   {/each}
 </div>
 
 <style>
   .note {
     font-size: var(--note-size, 30px);
-    line-height: 1.55;
-    max-width: 44ch;
+    line-height: 1.5;
+    max-width: 42ch;
+    letter-spacing: -0.005em;
     text-wrap: pretty;
   }
 
   p,
   ul {
-    margin: 0 0 0.75em;
+    margin: 0 0 0.7em;
   }
 
   ul {
@@ -42,17 +44,18 @@
   }
 
   li::marker {
-    color: var(--fg-3);
+    color: var(--accent);
   }
 
   .note :global(strong) {
-    color: #fff;
-    font-weight: 650;
+    font-weight: 700;
   }
 
+  /* ==highlight== reads like a red pen mark. */
   .note :global(mark) {
     background: none;
-    color: var(--warn);
+    color: var(--accent);
+    font-weight: 600;
   }
 
   .note :global(code) {
@@ -63,7 +66,7 @@
   }
 
   .cue {
-    font-size: 0.62em;
+    font-size: 0.58em;
     color: var(--fg-3);
   }
 

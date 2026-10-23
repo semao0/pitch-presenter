@@ -12,6 +12,7 @@ use notify_debouncer_full::{DebounceEventResult, Debouncer, RecommendedCache, ne
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager};
 
+use crate::i18n::tr;
 use crate::notes::{self, Notes};
 use crate::render::Rendered;
 use crate::state::AppState;
@@ -89,7 +90,7 @@ impl Session {
             None => Notes::default(),
         };
         let fallback_title = deck_path.file_stem().map_or_else(
-            || "Презентация".into(),
+            || tr!("Презентация", "Presentation"),
             |s| s.to_string_lossy().into_owned(),
         );
         let watcher = notes_path.as_deref().and_then(|p| watch(app, p));

@@ -5,6 +5,8 @@
   import { getCurrentWindow } from '@tauri-apps/api/window';
   import { onMount } from 'svelte';
   import { api, events, slideUrl } from '../lib/api';
+  import { shortcutKey } from '../lib/keys';
+  import { t } from '../lib/settings.svelte';
   import { SlidePreloader } from '../lib/preload';
   import type { ViewState } from '../lib/types';
 
@@ -36,7 +38,7 @@
     const back = 1 - front;
     if (layers[back] === url) front = back;
     else layers[back] = url;
-    void win.setTitle(`Показ · ${next.slide}/${next.count}`);
+    void win.setTitle(`${t('audience.title')} · ${next.slide}/${next.count}`);
   }
 
   function onLayerLoad(index: number, e: Event) {
@@ -51,12 +53,13 @@
   function onkeydown(e: KeyboardEvent) {
     if (e.ctrlKey || e.altKey || e.metaKey) return;
     e.preventDefault();
-    if (e.key === 'f' || e.key === 'F') {
+    const key = shortcutKey(e);
+    if (key === 'f' || key === 'F') {
       void toggleFullscreen();
-    } else if (e.key === 'Escape') {
+    } else if (key === 'Escape') {
       void win.setFullscreen(false);
     } else {
-      void events.sendRemoteKey(e.key);
+      void events.sendRemoteKey(key);
     }
   }
 
@@ -108,9 +111,9 @@
   {/each}
   <div class="blank" class:on={view?.blank}></div>
   {#if !view}
-    <p class="empty">Нет открытой презентации</p>
+    <p class="empty">{t('audience.empty')}</p>
   {/if}
-  <div class="hint" class:gone={!hint}>Клик — вперёд · правый клик — назад · двойной клик или F — полный экран</div>
+  <div class="hint" class:gone={!hint}>{t('audience.hint')}</div>
 </div>
 
 <style>

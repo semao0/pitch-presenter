@@ -1,6 +1,7 @@
 <!-- A file picker row: shows the chosen file's name and folder. -->
 <script lang="ts">
   import { baseName, dirName } from '../lib/api';
+  import { t } from '../lib/settings.svelte';
   import Icon, { type IconName } from './Icon.svelte';
 
   interface Props {
@@ -32,7 +33,7 @@
       </span>
     </button>
     {#if path && onclear}
-      <button class="icon-btn clear" {disabled} onclick={onclear} title="Убрать" aria-label="Убрать {label}">
+      <button class="icon-btn" {disabled} onclick={onclear} title={t('start.remove')} aria-label={t('start.remove')}>
         <Icon name="close" size={16} />
       </button>
     {/if}
@@ -43,11 +44,6 @@
   .field {
     display: grid;
     gap: 8px;
-  }
-
-  .label {
-    font-size: 13px;
-    color: var(--fg-3);
   }
 
   .row {
@@ -62,28 +58,32 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 10px 14px;
+    padding: 11px 14px;
     text-align: left;
-    background: var(--surface-2);
-    border: 1px solid var(--line);
+    background: var(--surface);
+    border: 1px solid var(--line-strong);
     border-radius: var(--radius);
     transition: border-color 0.15s;
   }
 
   .file:hover:not(:disabled) {
-    border-color: var(--line-strong);
+    border-color: var(--fg-3);
   }
 
   .file:disabled {
     cursor: default;
   }
 
+  .file.empty {
+    border-style: dashed;
+  }
+
   .icon {
-    color: var(--accent);
+    color: var(--fg);
   }
 
   .empty .icon {
-    color: var(--fg-3);
+    color: var(--fg-4);
   }
 
   .text {
@@ -100,7 +100,7 @@
   }
 
   .name {
-    font-weight: 500;
+    font-weight: 550;
   }
 
   .empty .name {
@@ -110,16 +110,12 @@
 
   .dir {
     font-size: 12px;
-    color: var(--fg-4);
+    color: var(--fg-3);
   }
 
   .path {
     /* Truncate long paths from the start: the nearest folders matter most. */
     direction: rtl;
     text-align: left;
-  }
-
-  .clear {
-    flex: none;
   }
 </style>

@@ -2,6 +2,7 @@
      presenter (the audience window forwards keys there too). -->
 <script lang="ts">
   import { slideUrl } from '../lib/api';
+  import { t } from '../lib/settings.svelte';
   import type { Deck } from '../lib/types';
 
   interface Props {
@@ -30,7 +31,7 @@
     bind:this={grid}
     role="listbox"
     tabindex="-1"
-    aria-label="Слайды"
+    aria-label={t('overview.label')}
     onclick={(e) => e.stopPropagation()}
     onkeydown={() => {}}
   >
@@ -48,7 +49,7 @@
         <span class="caption">
           <span class="n tabular">{n}</span>
           <span class="title">{note?.title ?? ''}</span>
-          {#if note?.reserve}<span class="reserve">резерв</span>{/if}
+          {#if note?.reserve}<span class="reserve">{t('presenter.reserve')}</span>{/if}
         </span>
       </button>
     {/each}
@@ -62,16 +63,16 @@
     z-index: 20;
     display: grid;
     padding: 40px;
-    background: rgb(6 7 9 / 82%);
-    backdrop-filter: blur(6px);
-    animation: fade 0.14s ease-out;
+    background: var(--backdrop);
+    backdrop-filter: blur(8px);
+    animation: fade-in 0.14s ease-out;
   }
 
   .grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
     align-content: start;
-    gap: 22px 18px;
+    gap: 24px 20px;
     max-width: 1500px;
     width: 100%;
     margin: 0 auto;
@@ -92,8 +93,9 @@
     object-fit: contain;
     background: var(--surface);
     border-radius: var(--radius-s);
+    box-shadow: var(--slide-shadow);
     outline: 2px solid transparent;
-    outline-offset: 3px;
+    outline-offset: 4px;
     transition: outline-color 0.12s;
   }
 
@@ -118,8 +120,8 @@
   }
 
   .n {
-    color: var(--fg-2);
-    font-weight: 600;
+    color: var(--fg);
+    font-weight: 650;
   }
 
   .selected .n {
@@ -137,11 +139,5 @@
     margin-left: auto;
     color: var(--warn);
     font-size: 11px;
-  }
-
-  @keyframes fade {
-    from {
-      opacity: 0;
-    }
   }
 </style>

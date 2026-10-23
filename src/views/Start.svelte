@@ -5,7 +5,9 @@
   import { onMount } from 'svelte';
   import FileField from '../components/FileField.svelte';
   import Icon from '../components/Icon.svelte';
+  import Preferences from '../components/Preferences.svelte';
   import { api, baseName, dirName, events } from '../lib/api';
+  import { settings, t } from '../lib/settings.svelte';
   import type { Deck, Progress, RecentDeck } from '../lib/types';
 
   let { onopen }: { onopen: (deck: Deck) => void } = $props();
@@ -28,6 +30,12 @@
   const percent = $derived(
     progress?.stage === 'rendering' && progress.total > 0 ? (progress.done / progress.total) * 100 : null,
   );
+
+  // Backend errors come in the language they were raised in; drop a stale one.
+  $effect(() => {
+    void settings.lang;
+    error = null;
+  });
 
   onMount(() => {
     void api.launchInfo().then((info) => {
@@ -83,8 +91,8 @@
 
   async function pickDeck() {
     const path = await open({
-      title: 'Презентация',
-      filters: [{ name: 'Презентации', extensions: DECK_EXTENSIONS }],
+      title: t('start.deck'),
+      filters: [{ name: t('start.deck.filter'), extensions: DECK_EXTENSIONS }],
       defaultPath: deck ? dirName(deck) : undefined,
     });
     if (path) await setDeck(path);
@@ -92,8 +100,8 @@
 
   async function pickNotes() {
     const path = await open({
-      title: 'Текст спикера',
-      filters: [{ name: 'Текст спикера (TOML)', extensions: ['toml'] }],
+      title: t('start.notes'),
+      filters: [{ name: t('start.notes.filter'), extensions: ['toml'] }],
       defaultPath: notes ? dirName(notes) : deck ? dirName(deck) : undefined,
     });
     if (path) setNotes(path);
@@ -106,7 +114,7 @@
   async function start() {
     if (busy) return;
     if (!deck) {
-      error = 'Выберите файл презентации';
+      error = t('start.noDeck');
       return;
     }
     busy = true;
@@ -129,8 +137,8 @@
     if (now) await start();
   }
 
-  const relative = new Intl.RelativeTimeFormat('ru', { numeric: 'auto' });
   function ago(unixSeconds: number): string {
+    const relative = new Intl.RelativeTimeFormat(settings.lang, { numeric: 'auto' });
     const minutesAgo = Math.round((unixSeconds * 1000 - Date.now()) / 60_000);
     if (minutesAgo > -60) return relative.format(minutesAgo, 'minute');
     if (minutesAgo > -60 * 24) return relative.format(Math.round(minutesAgo / 60), 'hour');
@@ -147,162 +155,197 @@
 
 <svelte:window {onkeydown} />
 
-<div class="start" class:has-recent={recent.length > 0}>
-  <section class="card" aria-busy={busy}>
+<div class="start">
+  <div class="corner"><Preferences /></div>
+
+  <div class="layout" class:has-recent={recent.length > 0}>
     <header>
-      <img class="logo" src="/icon.svg" alt="" width="44" height="44" />
-      <div>
-        <h1>Pitch Presenter</h1>
-        <p>Слайды, текст спикера и таймер — в одном окне</p>
-      </div>
+      <img class="logo" src="/icon.svg" alt="" width="56" height="56" />
+      <h1>Pitch Presenter</h1>
+      <p>{t('app.tagline')}</p>
     </header>
 
-    <FileField
-      label="Презентация"
-      icon="file"
-      path={deck}
-      placeholder="Выбрать PDF или PPTX…"
-      hint="или перетащите файл в окно"
-      disabled={busy}
-      onpick={pickDeck}
-    />
-    <FileField
-      label="Текст спикера"
-      icon="notes"
-      path={notes}
-      placeholder="Выбрать .toml…"
-      hint="необязательно · подхватывается рядом с презентацией"
-      disabled={busy}
-      onpick={pickNotes}
-      onclear={() => setNotes(null)}
-    />
+    <section class="card" aria-busy={busy}>
+      <FileField
+        label={t('start.deck')}
+        icon="file"
+        path={deck}
+        placeholder={t('start.deck.placeholder')}
+        hint={t('start.deck.hint')}
+        disabled={busy}
+        onpick={pickDeck}
+      />
+      <FileField
+        label={t('start.notes')}
+        icon="notes"
+        path={notes}
+        placeholder={t('start.notes.placeholder')}
+        hint={t('start.notes.hint')}
+        disabled={busy}
+        onpick={pickNotes}
+        onclear={() => setNotes(null)}
+      />
 
-    <div class="minutes">
-      <label for="minutes">Длительность</label>
-      <div class="stepper">
-        <button class="icon-btn" disabled={busy || minutes <= 0} onclick={() => setMinutes(minutes - 1)} aria-label="Меньше">
-          <Icon name="minus" size={16} />
-        </button>
-        <input
-          id="minutes"
-          class="tabular"
-          type="number"
-          min="0"
-          max={MAX_MINUTES}
-          disabled={busy}
-          value={minutes}
-          onchange={(e) => setMinutes(e.currentTarget.valueAsNumber)}
-        />
-        <button class="icon-btn" disabled={busy || minutes >= MAX_MINUTES} onclick={() => setMinutes(minutes + 1)} aria-label="Больше">
-          <Icon name="plus" size={16} />
-        </button>
+      <div class="minutes">
+        <label class="label" for="minutes">{t('start.minutes')}</label>
+        <div class="stepper">
+          <button
+            class="icon-btn"
+            disabled={busy || minutes <= 0}
+            onclick={() => setMinutes(minutes - 1)}
+            aria-label={t('start.less')}
+          >
+            <Icon name="minus" size={16} />
+          </button>
+          <input
+            id="minutes"
+            class="tabular"
+            type="number"
+            min="0"
+            max={MAX_MINUTES}
+            disabled={busy}
+            value={minutes}
+            onchange={(e) => setMinutes(e.currentTarget.valueAsNumber)}
+          />
+          <button
+            class="icon-btn"
+            disabled={busy || minutes >= MAX_MINUTES}
+            onclick={() => setMinutes(minutes + 1)}
+            aria-label={t('start.more')}
+          >
+            <Icon name="plus" size={16} />
+          </button>
+        </div>
+        <span class="hint">{minutes > 0 ? t('start.minutes.unit') : t('start.minutes.none')}</span>
       </div>
-      <span class="hint">{minutes > 0 ? 'мин' : 'без ограничения · время посчитается по тексту'}</span>
-    </div>
 
-    <footer>
-      <div class="status" role="status">
-        {#if busy}
-          <span>
-            {#if progress?.stage === 'converting'}
-              Конвертирую через LibreOffice…
-            {:else if progress?.stage === 'rendering'}
-              Готовлю слайды · <span class="tabular">{progress.done} / {progress.total}</span>
-            {:else}
-              Открываю…
-            {/if}
-          </span>
-          <div class="bar" class:indeterminate={percent === null}>
-            <div style:width={percent === null ? null : `${percent}%`}></div>
-          </div>
-        {:else if error}
-          <span class="error">{error}</span>
-        {/if}
-      </div>
-      <button class="btn primary go" disabled={busy || !deck} onclick={start}>
-        <Icon name="play" size={16} />
-        Начать
-      </button>
-    </footer>
-  </section>
+      <footer>
+        <div class="status" role="status">
+          {#if busy}
+            <span>
+              {#if progress?.stage === 'converting'}
+                {t('start.converting')}
+              {:else if progress?.stage === 'rendering'}
+                {t('start.rendering')} · <span class="tabular">{progress.done} / {progress.total}</span>
+              {:else}
+                {t('start.opening')}
+              {/if}
+            </span>
+            <div class="bar" class:indeterminate={percent === null}>
+              <div style:width={percent === null ? null : `${percent}%`}></div>
+            </div>
+          {:else if error}
+            <span class="error">{error}</span>
+          {/if}
+        </div>
+        <button class="btn primary go" disabled={busy || !deck} onclick={start}>
+          <span class="dot"></span>
+          {t('start.go')}
+        </button>
+      </footer>
+    </section>
 
-  {#if recent.length > 0}
-    <aside class="recent">
-      <h2>Недавние</h2>
-      <ul class="thin-scroll">
-        {#each recent as item (item.deck)}
-          <li>
-            <button
-              class:active={item.deck === deck}
-              disabled={busy}
-              onclick={() => openRecent(item, false)}
-              ondblclick={() => openRecent(item, true)}
-              title="{item.deck}&#10;Двойной клик — сразу начать"
-            >
-              <span class="name">{baseName(item.deck)}</span>
-              <span class="meta">
-                {#if item.notes}<Icon name="notes" size={13} />{/if}
-                {ago(item.openedAt)}
-              </span>
-            </button>
-          </li>
-        {/each}
-      </ul>
-    </aside>
-  {/if}
+    {#if recent.length > 0}
+      <aside class="recent">
+        <h2 class="label">{t('start.recent')}</h2>
+        <ul class="thin-scroll">
+          {#each recent as item (item.deck)}
+            <li>
+              <button
+                class:active={item.deck === deck}
+                disabled={busy}
+                onclick={() => openRecent(item, false)}
+                ondblclick={() => openRecent(item, true)}
+                title="{item.deck}&#10;{t('start.recent.hint')}"
+              >
+                <span class="name">{baseName(item.deck)}</span>
+                <span class="meta">
+                  {#if item.notes}<Icon name="notes" size={13} />{/if}
+                  {ago(item.openedAt)}
+                </span>
+              </button>
+            </li>
+          {/each}
+        </ul>
+      </aside>
+    {/if}
+  </div>
 
   {#if dragging}
     <div class="drop">
       <Icon name="upload" size={32} />
-      <span>Отпустите, чтобы открыть</span>
-      <small>PDF, PPTX и файл .toml с текстом</small>
+      <span>{t('start.drop')}</span>
+      <small>{t('start.drop.hint')}</small>
     </div>
   {/if}
 </div>
 
 <style>
   .start {
+    position: relative;
     height: 100%;
     display: grid;
-    place-content: center;
-    grid-template-columns: minmax(0, 520px);
-    gap: 20px;
+    place-items: center;
     padding: 32px;
-    background: radial-gradient(ellipse at top, #161a21 0%, var(--bg) 60%);
+    overflow-y: auto;
   }
 
-  .start.has-recent {
-    grid-template-columns: minmax(0, 520px) minmax(0, 300px);
+  .corner {
+    position: absolute;
+    top: 14px;
+    right: 16px;
   }
 
-  .card {
+  .layout {
     display: grid;
-    gap: 22px;
-    padding: 30px;
-    background: var(--surface);
-    border: 1px solid var(--line);
-    border-radius: var(--radius-l);
-    box-shadow: var(--shadow);
+    grid-template-columns: minmax(0, 500px);
+    grid-template-areas:
+      'header'
+      'card';
+    gap: 28px 32px;
+  }
+
+  .layout.has-recent {
+    grid-template-columns: minmax(0, 500px) minmax(0, 260px);
+    grid-template-areas:
+      'header .'
+      'card recent';
   }
 
   header {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    margin-bottom: 4px;
+    grid-area: header;
+    display: grid;
+    justify-items: start;
+    gap: 6px;
+  }
+
+  .logo {
+    margin-bottom: 14px;
   }
 
   h1 {
     margin: 0;
-    font-size: 20px;
-    font-weight: 650;
-    letter-spacing: -0.01em;
+    font-size: 30px;
+    font-weight: 700;
+    letter-spacing: -0.025em;
   }
 
   header p {
-    margin: 3px 0 0;
+    margin: 0;
+    max-width: 30em;
     color: var(--fg-3);
-    font-size: 14px;
+    font-size: 15px;
+  }
+
+  .card {
+    grid-area: card;
+    display: grid;
+    gap: 22px;
+    padding: 28px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-l);
+    box-shadow: var(--shadow);
   }
 
   .minutes {
@@ -314,8 +357,6 @@
 
   .minutes label {
     grid-column: 1 / -1;
-    font-size: 13px;
-    color: var(--fg-3);
   }
 
   .stepper {
@@ -323,16 +364,15 @@
     align-items: center;
     gap: 2px;
     padding: 2px;
-    background: var(--surface-2);
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
   }
 
   .stepper input {
-    width: 56px;
+    width: 52px;
     padding: 6px 0;
     text-align: center;
-    font-weight: 600;
+    font-weight: 650;
     background: none;
     border: 0;
     outline: none;
@@ -381,7 +421,7 @@
   }
 
   .bar {
-    height: 4px;
+    height: 3px;
     border-radius: 2px;
     background: var(--line);
     overflow: hidden;
@@ -409,25 +449,26 @@
   }
 
   .go {
-    height: 42px;
-    padding: 0 22px;
+    height: 44px;
+    padding: 0 24px 0 20px;
+    font-size: 15px;
+  }
+
+  .go .dot {
+    width: 10px;
+    height: 10px;
   }
 
   .recent {
+    grid-area: recent;
     display: flex;
     flex-direction: column;
     min-height: 0;
-    max-height: 100%;
-    padding: 8px 0;
+    max-height: 420px;
   }
 
   h2 {
     margin: 0 0 10px 12px;
-    font-size: 12px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--fg-4);
   }
 
   .recent ul {
@@ -460,7 +501,7 @@
   }
 
   .recent .name {
-    font-weight: 500;
+    font-weight: 550;
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
@@ -483,12 +524,12 @@
     gap: 10px;
     border: 2px dashed var(--accent);
     border-radius: var(--radius-l);
-    background: rgb(14 16 19 / 88%);
+    background: var(--backdrop);
     color: var(--accent);
     font-size: 18px;
-    font-weight: 500;
+    font-weight: 550;
     pointer-events: none;
-    animation: fade 0.12s ease-out;
+    animation: fade-in 0.12s ease-out;
   }
 
   .drop small {
@@ -497,15 +538,12 @@
     font-weight: 400;
   }
 
-  @keyframes fade {
-    from {
-      opacity: 0;
-    }
-  }
-
   @media (max-width: 900px) {
-    .start.has-recent {
-      grid-template-columns: minmax(0, 520px);
+    .layout.has-recent {
+      grid-template-columns: minmax(0, 500px);
+      grid-template-areas:
+        'header'
+        'card';
     }
     .recent {
       display: none;

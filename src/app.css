@@ -1,42 +1,76 @@
-/* Design tokens and base styles. The app is dark by design: presenters work in
-   dim rooms, and a bright screen on stage reflects on the speaker's face. */
+/* Design tokens and base styles.
+   The look follows the logo: paper and ink with thin lines, and a single red
+   accent reserved for what is "live" — progress, the running timer, the
+   audience window being on air. Light and dark themes share the same roles. */
 
 :root {
-  --bg: #0e1013;
-  --surface: #15181d;
-  --surface-2: #1b1f25;
-  --line: #262b33;
-  --line-strong: #353b45;
-  --fg: #eceef1;
-  --fg-2: #a3a9b3;
-  --fg-3: #6c727c;
-  --fg-4: #474d57;
+  --bg: #f6f6f4;
+  --surface: #ffffff;
+  --surface-2: #f0f0ed;
+  --line: #e4e4e0;
+  --line-strong: #cdcdc8;
+  --fg: #16181c;
+  --fg-2: #464a51;
+  --fg-3: #7c8088;
+  --fg-4: #abaeb4;
 
-  --accent: #6cb2ff;
-  --accent-fg: #07111f;
-  --accent-soft: rgb(108 178 255 / 14%);
-  --ok: #4cc38a;
-  --warn: #f2b84b;
-  --bad: #ff6b6b;
-  --warn-soft: rgb(242 184 75 / 12%);
-  --bad-soft: rgb(255 107 107 / 12%);
+  --ink: #16181c;
+  --ink-fg: #ffffff;
+  --accent: #e5342f;
+  --accent-soft: rgb(229 52 47 / 10%);
+  --ok: #23915c;
+  --warn: #c47a00;
+  --warn-soft: rgb(196 122 0 / 11%);
+  --bad: #e5342f;
+  --bad-soft: rgb(229 52 47 / 9%);
+
+  --backdrop: rgb(246 246 244 / 88%);
+  --shadow: 0 1px 2px rgb(22 24 28 / 4%), 0 12px 32px rgb(22 24 28 / 8%);
+  --slide-shadow: 0 0 0 1px var(--line), 0 4px 18px rgb(22 24 28 / 6%);
 
   --radius-s: 6px;
   --radius: 10px;
-  --radius-l: 14px;
-  --shadow: 0 12px 40px rgb(0 0 0 / 45%);
+  --radius-l: 16px;
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
 
   --font: 'Inter Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --mono: ui-monospace, 'SF Mono', 'JetBrains Mono', monospace;
 
-  color-scheme: dark;
+  color-scheme: light;
   font-family: var(--font);
   font-size: 15px;
   font-feature-settings: 'cv11', 'ss01';
   color: var(--fg);
   background: var(--bg);
   -webkit-font-smoothing: antialiased;
+}
+
+:root[data-theme='dark'] {
+  --bg: #111214;
+  --surface: #18191c;
+  --surface-2: #202125;
+  --line: #2a2c31;
+  --line-strong: #3b3e44;
+  --fg: #f2f2ef;
+  --fg-2: #b6b9bf;
+  --fg-3: #82868d;
+  --fg-4: #53575e;
+
+  --ink: #f2f2ef;
+  --ink-fg: #111214;
+  --accent: #ff4b43;
+  --accent-soft: rgb(255 75 67 / 14%);
+  --ok: #4cc38a;
+  --warn: #f2b84b;
+  --warn-soft: rgb(242 184 75 / 12%);
+  --bad: #ff5a52;
+  --bad-soft: rgb(255 90 82 / 12%);
+
+  --backdrop: rgb(17 18 20 / 88%);
+  --shadow: 0 1px 2px rgb(0 0 0 / 30%), 0 12px 40px rgb(0 0 0 / 45%);
+  --slide-shadow: 0 0 0 1px var(--line), 0 6px 24px rgb(0 0 0 / 35%);
+
+  color-scheme: dark;
 }
 
 *,
@@ -59,6 +93,7 @@ body {
   -webkit-user-select: none;
   overscroll-behavior: none;
   cursor: default;
+  transition: background 0.2s;
 }
 
 button,
@@ -83,51 +118,67 @@ button {
   font-variant-numeric: tabular-nums;
 }
 
+/* The brand mark: a red dot, used for "live" states. */
+.dot {
+  display: inline-block;
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
 /* Shared controls */
 
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 10px;
   height: 36px;
   padding: 0 14px;
-  border-radius: var(--radius-s);
-  border: 1px solid var(--line);
-  background: var(--surface-2);
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
   color: var(--fg);
   font-weight: 500;
   transition:
     border-color 0.15s,
-    background 0.15s;
+    background 0.15s,
+    transform 0.1s;
 }
 
 .btn:hover:not(:disabled) {
-  border-color: var(--line-strong);
+  border-color: var(--fg-3);
+}
+
+.btn:active:not(:disabled) {
+  transform: scale(0.98);
 }
 
 .btn:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: default;
 }
 
 .btn.primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--accent-fg);
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--ink-fg);
   font-weight: 600;
 }
 
 .btn.primary:hover:not(:disabled) {
-  filter: brightness(1.08);
+  border-color: var(--ink);
+  opacity: 0.9;
 }
 
 .icon-btn {
   display: inline-grid;
   place-items: center;
-  width: 34px;
+  min-width: 34px;
   height: 34px;
-  border-radius: var(--radius-s);
+  border-radius: 999px;
   color: var(--fg-3);
   transition:
     color 0.15s,
@@ -139,6 +190,14 @@ button {
   background: var(--surface-2);
 }
 
+.label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--fg-3);
+}
+
 kbd {
   display: inline-block;
   min-width: 22px;
@@ -146,7 +205,7 @@ kbd {
   border: 1px solid var(--line-strong);
   border-bottom-width: 2px;
   border-radius: 5px;
-  background: var(--bg);
+  background: var(--surface);
   color: var(--fg);
   font: 12px/1.4 var(--mono);
   text-align: center;
@@ -155,6 +214,12 @@ kbd {
 .thin-scroll {
   scrollbar-width: thin;
   scrollbar-color: var(--line-strong) transparent;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

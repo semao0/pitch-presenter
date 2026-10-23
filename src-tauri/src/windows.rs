@@ -8,6 +8,7 @@ use tauri::{
 };
 
 use crate::error::Result;
+use crate::i18n::tr;
 
 pub const MAIN: &str = "main";
 pub const AUDIENCE: &str = "audience";
@@ -32,7 +33,7 @@ pub fn open_audience(app: &AppHandle) -> Result<()> {
     }
 
     let builder = WebviewWindowBuilder::new(app, AUDIENCE, WebviewUrl::App("index.html".into()))
-        .title("Показ")
+        .title(tr!("Показ", "Audience"))
         .inner_size(1280.0, 720.0)
         .min_inner_size(320.0, 180.0)
         .background_color(Color(0, 0, 0, 255))

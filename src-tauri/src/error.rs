@@ -38,7 +38,15 @@ impl Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let message = match self {
-            Self::Io { path, source } => format!("{path}: {source}"),
+            Self::Io { path, source } => {
+                // OS messages are always English; translate the common ones.
+                let reason = match source.kind() {
+                    std::io::ErrorKind::NotFound => tr!("файл не найден", "file not found"),
+                    std::io::ErrorKind::PermissionDenied => tr!("нет доступа", "permission denied"),
+                    _ => source.to_string(),
+                };
+                format!("{path}: {reason}")
+            }
             Self::Notes { file, message } => {
                 tr!("Ошибка в {file}: {message}", "Error in {file}: {message}")
             }

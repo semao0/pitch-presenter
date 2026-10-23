@@ -182,13 +182,58 @@ fn parse(source: &str, slide_count: u32) -> std::result::Result<Notes, String> {
 /// doesn't fit in a one-line banner.
 fn describe(e: &toml::de::Error, source: &str) -> String {
     let message = e.message().trim();
+    let message = if crate::i18n::english() {
+        message.to_owned()
+    } else {
+        localize_toml(message)
+    };
     match e.span() {
         Some(span) => {
             let line = source[..span.start.min(source.len())].matches('\n').count() + 1;
             tr!("строка {line}: {message}", "line {line}: {message}")
         }
-        None => message.to_owned(),
+        None => message,
     }
+}
+
+/// Russian versions of the schema errors serde reports most often; anything
+/// else (rare syntax errors) stays in the parser's English.
+fn localize_toml(message: &str) -> String {
+    if let Some(rest) = message.strip_prefix("unknown field ") {
+        let (field, allowed) = rest.split_once(", expected ").unwrap_or((rest, ""));
+        let allowed = allowed.trim_start_matches("one of ");
+        return if allowed.is_empty() {
+            format!("неизвестное поле {field}")
+        } else {
+            format!("неизвестное поле {field}, допустимые: {allowed}")
+        };
+    }
+    if let Some(field) = message.strip_prefix("missing field ") {
+        return format!("нет обязательного поля {field}");
+    }
+    for (prefix, ru) in [
+        ("invalid type: ", "неверный тип"),
+        ("invalid value: ", "недопустимое значение"),
+    ] {
+        if let Some(rest) = message.strip_prefix(prefix) {
+            let (got, expected) = rest.split_once(", expected ").unwrap_or((rest, ""));
+            let expected = match expected {
+                "u32" => "целое число от 0",
+                "f64" => "число",
+                "a boolean" => "true или false",
+                "a string" => "строка в кавычках",
+                "a sequence" => "список [[slide]]",
+                other => other,
+            };
+            let got = got
+                .replacen("string", "строка", 1)
+                .replacen("integer", "число", 1)
+                .replacen("boolean", "логическое", 1)
+                .replacen("floating point", "дробное число", 1);
+            return format!("{ru}: {got}, нужно: {expected}");
+        }
+    }
+    message.to_owned()
 }
 
 #[cfg(test)]
@@ -292,7 +337,10 @@ mod tests {
             1,
         )
         .unwrap_err();
-        assert!(err.starts_with("строка 5: unknown field `tiem`"), "{err}");
+        assert!(
+            err.starts_with("строка 5: неизвестное поле `tiem`, допустимые: `n`"),
+            "{err}"
+        );
     }
 
     #[test]
@@ -301,6 +349,19 @@ mod tests {
         let err = parse("[[slide]]\nn = 0\ntext = \"x\"", 1).unwrap_err();
         crate::i18n::set_english(false);
         assert_eq!(err, "[[slide]] #1: slides are numbered from 1");
+    }
+
+    #[test]
+    fn schema_errors_in_russian() {
+        let err = parse("[[slide]]\ntext = \"x\"", 1).unwrap_err();
+        assert!(err.ends_with("нет обязательного поля `n`"), "{err}");
+        let err = parse("[[slide]]\nn = \"one\"\ntext = \"x\"", 1).unwrap_err();
+        assert!(
+            err.contains("неверный тип: строка \"one\", нужно: целое число от 0"),
+            "{err}"
+        );
+        let err = parse("[[slide]]\nn = 1\nreserve = 1\ntext = \"x\"", 1).unwrap_err();
+        assert!(err.contains("нужно: true или false"), "{err}");
     }
 
     #[test]

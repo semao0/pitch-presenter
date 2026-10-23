@@ -21,6 +21,7 @@ use pdfium_render::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::error::{Error, Result};
+use crate::i18n::tr;
 
 /// Bumped whenever the on-disk layout or rendering changes, invalidating caches.
 const CACHE_FORMAT: u32 = 2;
@@ -242,8 +243,9 @@ impl Renderer {
     fn convert_to_pdf(&self, deck: &Path, out: &Path) -> Result<PathBuf> {
         let soffice = find_soffice().ok_or(Error::NoLibreOffice)?;
         let profile = self.cache_root.join("libreoffice-profile");
-        let profile_url = tauri::Url::from_directory_path(&profile)
-            .map_err(|()| Error::Conversion("некорректный путь к кэшу".into()))?;
+        let profile_url = tauri::Url::from_directory_path(&profile).map_err(|()| {
+            Error::Conversion(tr!("некорректный путь к кэшу", "invalid cache path"))
+        })?;
 
         log::info!("converting {} with {}", deck.display(), soffice.display());
         let mut child = Command::new(&soffice)
@@ -274,7 +276,10 @@ impl Renderer {
             if started.elapsed() > CONVERSION_TIMEOUT {
                 let _ = child.kill();
                 let _ = child.wait();
-                return Err(Error::Conversion("превышено время ожидания".into()));
+                return Err(Error::Conversion(tr!(
+                    "превышено время ожидания",
+                    "timed out"
+                )));
             }
             thread::sleep(Duration::from_millis(100));
         };
@@ -294,9 +299,9 @@ impl Renderer {
         let detail = stderr
             .map(|s| s.trim().to_owned())
             .filter(|s| !s.is_empty());
-        Err(Error::Conversion(
-            detail.unwrap_or_else(|| format!("код выхода {status}")),
-        ))
+        Err(Error::Conversion(detail.unwrap_or_else(|| {
+            tr!("код выхода {status}", "exit status {status}")
+        })))
     }
 
     /// Removes all but the most recently used cache entries.

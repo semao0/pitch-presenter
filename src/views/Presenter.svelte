@@ -11,7 +11,7 @@
   import { computePlan, formatDuration, pace } from '../lib/plan';
   import { SlidePreloader } from '../lib/preload';
   import { shortcutKey } from '../lib/keys';
-  import { settings, t } from '../lib/settings.svelte';
+  import { t } from '../lib/settings.svelte';
   import { prefs } from '../lib/storage';
   import { TalkTimer } from '../lib/timer.svelte';
   import type { Deck, Nav, ViewState } from '../lib/types';
@@ -48,7 +48,6 @@
   const spentHere = $derived(timer.spentOn(view.slide));
   const remaining = $derived(deck.minutes > 0 ? deck.minutes * 60_000 - timer.elapsed : null);
   const currentPace = $derived(timer.pristine ? null : pace(plan, view.slide, timer.elapsed, spentHere));
-  const clock = $derived(new Date(timer.now).toLocaleTimeString(settings.lang, { hour: '2-digit', minute: '2-digit' }));
   const warnings = $derived(deck.notes.warnings);
 
   // Slide sizes follow the stage box. Measured with a ResizeObserver (via
@@ -339,8 +338,6 @@
       </span>
     {/if}
 
-    <span class="clock tabular" title={t('presenter.clock')}>{clock}</span>
-
     <button class="audience" class:on={audienceOpen} onclick={() => api.openAudience()} title={t('presenter.audience.tip')}>
       <span class="dot"></span>{audienceOpen ? t('presenter.audience.on') : t('presenter.audience')}
     </button>
@@ -609,11 +606,6 @@
 
   .pace.late {
     color: var(--bad);
-  }
-
-  .clock {
-    font-size: 14px;
-    color: var(--fg-3);
   }
 
   .audience {
@@ -903,8 +895,7 @@
     }
     .stage,
     .splitter,
-    .title,
-    .clock {
+    .title {
       display: none;
     }
   }

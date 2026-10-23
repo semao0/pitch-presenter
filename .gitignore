@@ -1,6 +1,11 @@
-__pycache__/
-.venv/
-.venv-mac/
-build/
+# Frontend
+node_modules/
 dist/
-*.spec
+
+# Tauri / Rust
+src-tauri/target/
+src-tauri/gen/
+# Downloaded by scripts/fetch-pdfium.sh
+src-tauri/pdfium/
+
+.DS_Store

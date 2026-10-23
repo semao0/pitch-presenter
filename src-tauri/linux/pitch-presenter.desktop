@@ -1,11 +1,10 @@
 [Desktop Entry]
 Type=Application
-Name=Pitch Presenter
-Name[ru]=Pitch Presenter
+Name={{name}}
 Comment=Presenter view for PDF/PPTX with speaker notes
 Comment[ru]=Режим докладчика для PDF/PPTX с текстом спикера
-Exec=pitch-presenter %F
-Icon=pitch-presenter
+Exec={{exec}} %F
+Icon={{icon}}
 Terminal=false
 Categories=Office;Presentation;
 MimeType=application/pdf;application/vnd.openxmlformats-officedocument.presentationml.presentation;application/vnd.ms-powerpoint;application/vnd.oasis.opendocument.presentation;

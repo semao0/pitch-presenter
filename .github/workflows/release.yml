@@ -1,0 +1,79 @@
+# Builds installers for every platform and attaches them to a draft release.
+# Trigger: push a tag like v2.0.0, or run it manually from the Actions tab.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Ubuntu 22.04 has the oldest glibc we target, so .deb/.AppImage also run on older distros.
+          - runner: ubuntu-22.04
+            pdfium: linux-x64
+            args: ""
+          - runner: ubuntu-22.04-arm
+            pdfium: linux-arm64
+            args: ""
+          - runner: windows-latest
+            pdfium: win-x64
+            args: ""
+          - runner: macos-latest
+            pdfium: mac-arm64
+            target: aarch64-apple-darwin
+            args: --target aarch64-apple-darwin
+          - runner: macos-latest
+            pdfium: mac-x64
+            target: x86_64-apple-darwin
+            args: --target x86_64-apple-darwin
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: System libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: ${{ matrix.pdfium }}
+
+      - name: PDFium
+        shell: bash
+        run: scripts/fetch-pdfium.sh ${{ matrix.pdfium }}
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: v__VERSION__
+          releaseName: Pitch Presenter __VERSION__
+          releaseBody: |
+            **macOS:** `aarch64` — Apple Silicon, `x64` — Intel. Приложение не нотаризовано: при первом запуске — правый клик → «Открыть».
+            **Windows:** установщик `.exe` (или `.msi` для администраторов).
+            **Linux:** `.deb` для Debian/Ubuntu, `.rpm` для Fedora или переносимый `.AppImage`.
+            Для PPTX/ODP/Key нужен установленный LibreOffice; PDF открывается без него.
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}

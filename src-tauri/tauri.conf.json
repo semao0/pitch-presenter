@@ -1,0 +1,68 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Pitch Presenter",
+  "mainBinaryName": "pitch-presenter",
+  "version": "2.0.0",
+  "identifier": "dev.semao0.PitchPresenter",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Pitch Presenter",
+        "width": 1180,
+        "height": 760,
+        "minWidth": 720,
+        "minHeight": 520,
+        "center": true,
+        "backgroundColor": "#0e1013",
+        "dragDropEnabled": true
+      }
+    ],
+    "security": {
+      "csp": {
+        "default-src": "'self'",
+        "img-src": "'self' slide: http://slide.localhost data:",
+        "style-src": "'self' 'unsafe-inline'",
+        "font-src": "'self' data:",
+        "connect-src": "ipc: http://ipc.localhost"
+      }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "category": "Productivity",
+    "shortDescription": "Presenter view for PDF and PPTX",
+    "longDescription": "Presenter view for PDF and PPTX: current and next slide, speaker notes from TOML, a talk timer with per-slide limits, and a separate audience window for a projector or screen sharing.",
+    "copyright": "© semao0",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.png"
+    ],
+    "fileAssociations": [
+      {
+        "ext": ["pdf"],
+        "mimeType": "application/pdf",
+        "name": "PDF",
+        "role": "Viewer",
+        "rank": "Alternate"
+      },
+      {
+        "ext": ["pptx", "ppt", "odp", "key"],
+        "mimeType": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        "name": "Presentation",
+        "role": "Viewer",
+        "rank": "Alternate"
+      }
+    ]
+  }
+}

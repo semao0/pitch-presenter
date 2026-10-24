@@ -4,7 +4,7 @@
   import { onMount, untrack } from 'svelte';
   import Help from '../components/Help.svelte';
   import Icon from '../components/Icon.svelte';
-  import NoteBody from '../components/NoteBody.svelte';
+  import SpeechNotes from '../components/SpeechNotes.svelte';
   import Overview from '../components/Overview.svelte';
   import Preferences from '../components/Preferences.svelte';
   import { api, events, slideUrl } from '../lib/api';
@@ -423,7 +423,7 @@
         {#if note?.reserve}<span class="reserve">{t('presenter.reserve')}</span>{/if}
         {#if note?.seconds}<span class="limit tabular"><Icon name="clock" size={13} />{formatDuration(note.seconds * 1000)}</span>{/if}
       </div>
-      <NoteBody blocks={note?.blocks ?? []} />
+      <SpeechNotes blocks={note?.blocks ?? []} slide={view.slide} container={notesEl} />
       {#if !isLast}
         <div class="upnext">
           {t('presenter.then', { title: nextNote?.title ?? t('presenter.slideLower', { n: view.slide + 1 }) })}

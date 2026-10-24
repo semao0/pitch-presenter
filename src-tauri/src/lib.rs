@@ -16,6 +16,7 @@ mod i18n;
 mod notes;
 mod render;
 mod session;
+mod speech;
 mod state;
 mod windows;
 
@@ -59,6 +60,7 @@ pub fn run() {
         .setup(|app| {
             let state = init_state(app.handle())?;
             app.manage(state);
+            app.manage(speech::SpeechState::default());
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -67,6 +69,7 @@ pub fn run() {
                 && matches!(event, WindowEvent::CloseRequested { .. })
             {
                 windows::close_audience(window.app_handle());
+                window.state::<speech::SpeechState>().stop();
             }
         })
         .invoke_handler(tauri::generate_handler![
@@ -81,6 +84,9 @@ pub fn run() {
             commands::navigate,
             commands::open_audience,
             commands::audience_open,
+            speech::speech_start,
+            speech::speech_stop,
+            speech::speech_context,
         ])
         .build(tauri::generate_context!())
         .expect("error while building the application");
@@ -93,6 +99,7 @@ pub fn run() {
             open_files(app, files);
         }
         if let RunEvent::Exit = event {
+            app.state::<speech::SpeechState>().stop();
             app.state::<AppState>().replace_session(None);
         }
     });

@@ -128,6 +128,7 @@ pub async fn open_deck(
 /// Ends the session and returns to the start screen.
 #[tauri::command]
 pub fn close_deck(app: AppHandle, state: State<'_, AppState>) {
+    app.state::<crate::speech::SpeechState>().stop();
     windows::close_audience(&app);
     state.replace_session(None);
 }

@@ -1,6 +1,14 @@
 // UI strings in Russian and English. `{name}` placeholders are filled by `t`.
 
 const ru = {
+  'speech.start': 'Следить за речью',
+  'speech.stop': '● Микрофон включён · выключить',
+  'speech.cancel': 'Отменить',
+  'speech.stopping': 'Останавливаем…',
+  'speech.loading': 'Подготовка GigaAM…',
+  'speech.download': 'Скачиваем модель · {mb} МБ',
+  'speech.listening': 'Слежение за русским текстом',
+  'speech.hint': 'GigaAM · русская речь · модель ≈230 МБ при первом включении. Звук обрабатывается на устройстве и не сохраняется.',
   'app.tagline': 'Слайды, текст и время — у вас. Зал видит только слайды.',
 
   'start.deck': 'Презентация',
@@ -88,6 +96,14 @@ const ru = {
 type Key = keyof typeof ru;
 
 const en: Record<Key, string> = {
+  'speech.start': 'Follow speech',
+  'speech.stop': '● Microphone on · turn off',
+  'speech.cancel': 'Cancel',
+  'speech.stopping': 'Stopping…',
+  'speech.loading': 'Preparing GigaAM…',
+  'speech.download': 'Downloading model · {mb} MB',
+  'speech.listening': 'Following Russian speech',
+  'speech.hint': 'GigaAM · Russian speech · ≈230 MB model on first use. Audio is processed on your device and never saved.',
   'app.tagline': 'Slides, notes and time for you. The audience sees only the slides.',
 
   'start.deck': 'Presentation',

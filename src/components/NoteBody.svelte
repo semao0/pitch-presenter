@@ -3,18 +3,20 @@
   import { t } from '../lib/settings.svelte';
   import type { Block } from '../lib/types';
   import Inlines from './Inlines.svelte';
+  import { blockOffsets, inlineWords } from '../lib/speech';
 
-  let { blocks }: { blocks: Block[] } = $props();
+  let { blocks, position = -1 }: { blocks: Block[]; position?: number } = $props();
+  const offsets = $derived(blockOffsets(blocks));
 </script>
 
 <div class="note">
   {#each blocks as block, i (i)}
     {#if block.kind === 'paragraph'}
-      <p><Inlines nodes={block.content} /></p>
+      <p><Inlines nodes={block.content} offset={offsets[i]!} {position} /></p>
     {:else if block.kind === 'list'}
       <ul>
         {#each block.content as item, j (j)}
-          <li><Inlines nodes={item} /></li>
+          <li><Inlines nodes={item} offset={offsets[i]! + block.content.slice(0, j).flatMap(inlineWords).length} {position} /></li>
         {/each}
       </ul>
     {:else}

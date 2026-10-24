@@ -37,6 +37,28 @@ English and Russian interface.
   <img src="docs/dark.png" alt="Dark theme">
 </p>
 
+## Follow speech
+
+Click **Follow speech** above the notes to enable the default microphone. Spoken words fade,
+the current position is underlined, and longer notes scroll automatically. Slides still advance
+manually; tracking resets for each slide. Cues marked with `>` are excluded. Click the microphone
+button to stop following.
+
+On first use, GigaAM v3 CTC and Silero VAD are downloaded (about 230 MB) and verified with
+SHA-256. Recognition then works offline: audio is never saved or sent to a server. Models live
+in the application's data directory, separately from the installer. Closing the presentation
+turns off the microphone. On macOS, allow microphone access when prompted.
+
+Tracking updates about every 300 ms when the computer can keep up. It usually processes
+the latest 2 seconds of audio, extending to 3 seconds every 1.5 seconds and at phrase endings
+to recover context. The update interval grows automatically on slower computers. This interval
+is not the highlighting latency: recognition time and matching several spoken words also matter.
+
+Currently supports Russian speech only. This experimental feature can lag or miss passages
+with noise, improvisation, numbers or English terms. Phrases shorter than three words do not
+advance the cursor. Manual scrolling remains available; turn tracking off for long digressions.
+It uses the open base model, not the private Glas weights fine-tuned for English loanwords.
+
 ## Speaker notes
 
 Put `talk.toml` next to `talk.pdf` and it is picked up automatically.

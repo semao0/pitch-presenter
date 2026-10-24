@@ -1,6 +1,6 @@
 [package]
 name = "pitch-presenter"
-version = "2.0.0"
+version = "2.1.0"
 description = "Presenter view for PDF and PPTX with speaker notes and a timer"
 authors = ["semao0 <belousovsemen40@gmail.com>"]
 repository = "https://github.com/semao0/pitch-presenter"

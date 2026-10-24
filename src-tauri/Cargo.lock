@@ -3034,7 +3034,7 @@ checksum = "ad78bf43dcf80e8f950c92b84f938a0fc7590b7f6866fbcbeca781609c115590"
 
 [[package]]
 name = "pitch-presenter"
-version = "2.0.0"
+version = "2.1.0"
 dependencies = [
  "blake3",
  "cpal",

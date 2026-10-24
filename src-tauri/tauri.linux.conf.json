@@ -1,7 +1,10 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "bundle": {
-    "resources": { "pdfium/libpdfium.so": "pdfium/libpdfium.so" },
+    "resources": {
+      "pdfium/libpdfium.so": "pdfium/libpdfium.so",
+      "pdfium/licenses/": "pdfium/licenses/"
+    },
     "linux": {
       "deb": {
         "section": "misc",

@@ -30,10 +30,6 @@ jobs:
             pdfium: mac-arm64
             target: aarch64-apple-darwin
             args: --target aarch64-apple-darwin
-          - runner: macos-latest
-            pdfium: mac-x64
-            target: x86_64-apple-darwin
-            args: --target x86_64-apple-darwin
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -70,7 +66,7 @@ jobs:
           tagName: v__VERSION__
           releaseName: Pitch Presenter __VERSION__
           releaseBody: |
-            **macOS:** `aarch64` — Apple Silicon, `x64` — Intel. Приложение не нотаризовано: при первом запуске — правый клик → «Открыть».
+            **macOS:** Apple Silicon. Приложение не нотаризовано: на macOS 14 при первом запуске — правый клик → «Открыть», на macOS 15 — «Системные настройки» → «Конфиденциальность и безопасность» → «Всё равно открыть».
             **Windows:** установщик `.exe` (или `.msi` для администраторов).
             **Linux:** `.deb` для Debian/Ubuntu, `.rpm` для Fedora или переносимый `.AppImage`.
             Для PPTX/ODP/Key нужен установленный LibreOffice; PDF открывается без него.

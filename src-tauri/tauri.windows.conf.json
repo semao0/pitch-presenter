@@ -1,7 +1,10 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "bundle": {
-    "resources": { "pdfium/pdfium.dll": "pdfium/pdfium.dll" },
+    "resources": {
+      "pdfium/pdfium.dll": "pdfium/pdfium.dll",
+      "pdfium/licenses/": "pdfium/licenses/"
+    },
     "windows": {
       "webviewInstallMode": { "type": "downloadBootstrapper" },
       "nsis": { "installMode": "currentUser", "languages": ["Russian", "English"] }

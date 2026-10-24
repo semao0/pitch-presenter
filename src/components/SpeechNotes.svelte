@@ -2,11 +2,31 @@
   import { Channel, invoke } from '@tauri-apps/api/core';
   import { onDestroy, tick, untrack } from 'svelte';
   import { t } from '../lib/settings.svelte';
-  import { followPosition, noteWords } from '../lib/speech';
+  import { finished, followPosition, noteWords } from '../lib/speech';
   import type { Block } from '../lib/types';
   import NoteBody from './NoteBody.svelte';
 
-  let { blocks, slide, container }: { blocks: Block[]; slide: number; container?: HTMLElement } = $props();
+  let {
+    blocks,
+    slide,
+    container,
+    autoAdvance = $bindable(false),
+    onfinished,
+  }: {
+    blocks: Block[];
+    slide: number;
+    container?: HTMLElement;
+    autoAdvance?: boolean;
+    /** The speaker has read this slide's text through (only with autoAdvance on). */
+    onfinished?: () => void;
+  } = $props();
+  // Auto-advance fires only when the cursor really walked the text, not jumped to
+  // its end, and the slide has been up for a while: the tail of the previous
+  // slide's speech must not skip the next one.
+  const AUTO_MIN_STEPS = 2;
+  const AUTO_MIN_SHOWN_MS = 4000;
+  let steps = 0;
+  let shownAt = Date.now();
   type SpeechEvent = { kind: 'loading' | 'listening' | 'stopped' }
     | { kind: 'download'; file: string; bytes: number }
     | { kind: 'text'; text: string; context: number }
@@ -25,6 +45,8 @@
     void slide;
     void blocks;
     position = 0;
+    steps = 0;
+    shownAt = Date.now();
     context++;
     if (untrack(() => active)) {
       void invoke('speech_context', { context }).catch((cause: unknown) => { error = String(cause); });
@@ -55,6 +77,9 @@
         const next = followPosition(script, event.text, position);
         if (next === position) return;
         position = next;
+        steps++;
+        if (autoAdvance && steps >= AUTO_MIN_STEPS && Date.now() - shownAt >= AUTO_MIN_SHOWN_MS &&
+            finished(position, script.length)) onfinished?.();
         void tick().then(() => {
           if (!alive || !container) return;
           const current = container.querySelector('[data-speech-current]');
@@ -87,6 +112,12 @@
     }}>
     {status === 'off' ? t('speech.start') : status === 'listening' ? t('speech.stop') : status === 'stopping' ? t('speech.stopping') : t('speech.cancel')}
   </button>
+  <button class="switch" role="switch" aria-checked={autoAdvance}
+    class:idle={autoAdvance && status !== 'listening'}
+    title={status === 'listening' ? t('speech.auto.hint') : t('speech.auto.idle')}
+    onclick={() => (autoAdvance = !autoAdvance)} onkeydown={(event) => {
+      if (event.key === ' ' || event.key === 'Enter') event.stopPropagation();
+    }}><span class="track"><span class="knob"></span></span>{t('speech.auto')}</button>
   <span role="status">
     {#if status === 'download'}{t('speech.download', { mb: downloaded })}
     {:else if status === 'loading'}{t('speech.loading')}
@@ -101,6 +132,13 @@
   .speech-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; font-size: 12px; color: var(--fg-3); }
   button { border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; background: var(--surface); color: var(--fg); cursor: pointer; }
   button.live { color: var(--accent); }
+  .switch { display: inline-flex; align-items: center; gap: 8px; border: 0; padding: 4px 2px; background: none; color: var(--fg-3); }
+  .switch:hover, .switch[aria-checked='true'] { color: var(--fg); }
+  .switch .track { position: relative; width: 30px; height: 18px; border-radius: 9px; background: var(--line); transition: background 0.2s; }
+  .switch .knob { position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--surface); box-shadow: 0 1px 2px #0003; transition: transform 0.2s; }
+  .switch[aria-checked='true'] .track { background: var(--accent); }
+  .switch[aria-checked='true'] .knob { transform: translateX(12px); }
+  .switch.idle { opacity: 0.55; }
   button:disabled { opacity: 0.5; cursor: default; }
   .hint, .error { font-size: 12px; line-height: 1.5; margin: 0 0 18px; color: var(--fg-3); }
 </style>

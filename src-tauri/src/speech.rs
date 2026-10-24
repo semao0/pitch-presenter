@@ -11,29 +11,55 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{FromSample, SizedSample};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
-use sherpa_onnx::LinearResampler;
 use tauri::ipc::Channel;
 use tauri::{Manager, State, WebviewWindow};
 
 use crate::i18n::tr;
 
-const MODEL_URL: &str = "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-ctc-giga-am-v3-russian-2025-12-16/resolve/main";
-const FILES: [(&str, &str); 4] = [
+/// GigaAM-v3 e2e-ctc (punctuation, digits) in GGUF Q8_0 for transcribe.cpp, and
+/// Silero VAD. Revisions are pinned and every file is checked by SHA-256; the
+/// licenses and NOTICEs are kept next to the weights, as MIT requires.
+const GIGAAM: &str = "https://huggingface.co/handy-computer/gigaam-v3-e2e-ctc-gguf/resolve/59717de63d50dd9dd93b3249da6ad3f2f1c4ad6b";
+const SILERO: &str = "https://huggingface.co/handy-computer/silero-vad-v6.2-gguf/resolve/a9b2d61c20ae4ddf3644edb34969e8185a485448";
+const MODEL: &str = "gigaam-v3-e2e-ctc-Q8_0.gguf";
+const VAD: &str = "silero-vad-v6.2-F32.gguf";
+/// (local name, base URL, remote name, SHA-256)
+const FILES: [(&str, &str, &str, &str); 6] = [
     (
+        "LICENSE",
+        GIGAAM,
         "LICENSE",
         "f00de6715714c7a63d08639cdbfaa40224eefc407302614bd19f1a8b98c875aa",
     ),
     (
-        "model.int8.onnx",
-        "f86ebfa0429ced91be6054fc344827e9c6c2572f3c318416cd974b06f66437ec",
+        "NOTICE",
+        GIGAAM,
+        "NOTICE",
+        "1c62a9e00fc06da6f7da6c80e9e7e856e3c10a179bb5e73b97d61426dfb584af",
     ),
     (
-        "tokens.txt",
-        "17cc514451bcceac9c280068c71502f8448f99e9fb1456b8d0761651fd0392f2",
+        MODEL,
+        GIGAAM,
+        MODEL,
+        "9ccce4750dc813a493d96ca15ee251712bedec15ac9a02fa3d2bd732f08ae5eb",
     ),
     (
-        "silero_vad.onnx",
-        "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6",
+        "silero-vad.LICENSE",
+        SILERO,
+        "LICENSE",
+        "2e63e9a38b6e8fc0c7bc37ce174caca1862870856c6daf5697cfb785e925520b",
+    ),
+    (
+        "silero-vad.NOTICE",
+        SILERO,
+        "NOTICE",
+        "f1ea43096a23b40d4b14fcf131586710035444e69e35051c5d83c60725b50555",
+    ),
+    (
+        VAD,
+        SILERO,
+        VAD,
+        "0d871a800c420fdd5d1b17a3aea4296d1c39608f0ff4a9295eb76457eb1c88e6",
     ),
 ];
 
@@ -173,18 +199,14 @@ fn prepare(
     events: &Channel<SpeechEvent>,
 ) -> Result<(), String> {
     std::fs::create_dir_all(directory).map_err(|error| error.to_string())?;
-    for (name, hash) in FILES {
+    remove_stale(directory);
+    for (name, base, remote, hash) in FILES {
         cancelled(cancel)?;
         let path = directory.join(name);
         if hash_file(&path, cancel).is_ok_and(|actual| actual == hash) {
             continue;
         }
-        let url = if name == "silero_vad.onnx" {
-            "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx"
-                .to_owned()
-        } else {
-            format!("{MODEL_URL}/{name}")
-        };
+        let url = format!("{base}/{remote}");
         let temporary = path.with_extension("part");
         let download = || -> Result<(), String> {
             let response = ureq::get(&url)
@@ -252,6 +274,20 @@ fn prepare(
     Ok(())
 }
 
+/// Deletes what is not ours to keep: unfinished downloads and the files of the
+/// sherpa-onnx model used before 2.2 (≈230 МБ).
+fn remove_stale(directory: &Path) {
+    let Ok(entries) = std::fs::read_dir(directory) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        if !FILES.iter().any(|(file, ..)| name == *file) {
+            let _ = std::fs::remove_file(entry.path());
+        }
+    }
+}
+
 fn input<T>(
     device: &cpal::Device,
     config: cpal::StreamConfig,
@@ -290,14 +326,14 @@ where
 fn microphone(
     sender: mpsc::SyncSender<Vec<f32>>,
     errors: mpsc::SyncSender<String>,
-) -> Result<(cpal::Stream, i32), String> {
+) -> Result<(cpal::Stream, u32), String> {
     let device = cpal::default_host()
         .default_input_device()
         .ok_or_else(|| tr!("Микрофон не найден", "No microphone found"))?;
     let config = device
         .default_input_config()
         .map_err(|error| error.to_string())?;
-    let rate = i32::try_from(config.sample_rate()).map_err(|error| error.to_string())?;
+    let rate = config.sample_rate();
     let stream = match config.sample_format() {
         cpal::SampleFormat::F32 => input::<f32>(&device, config.into(), sender, errors),
         cpal::SampleFormat::F64 => input::<f64>(&device, config.into(), sender, errors),
@@ -321,7 +357,8 @@ fn run(
     prepare(directory, cancel, events)?;
     cancelled(cancel)?;
     let _ = events.send(SpeechEvent::Loading);
-    let mut recognizer = recognition::Recognizer::load(directory)?;
+    let mut recognizer =
+        recognition::Recognizer::load(&directory.join(MODEL), &directory.join(VAD))?;
     cancelled(cancel)?;
     let (sender, receiver) = mpsc::sync_channel(128);
     let (errors, error_receiver) = mpsc::sync_channel(1);
@@ -331,8 +368,7 @@ fn run(
             "Could not start microphone: {error}"
         )
     })?;
-    let resampler = LinearResampler::create(rate, 16000)
-        .ok_or_else(|| tr!("Не удалось настроить звук", "Could not configure audio"))?;
+    let mut resampler = recognition::Resampler::new(rate);
     stream.play().map_err(|error| error.to_string())?;
     let _ = events.send(SpeechEvent::Listening);
     let mut current_context = context.load(Ordering::Relaxed);
@@ -360,7 +396,7 @@ fn run(
             }
         };
         for chunk in std::iter::once(audio).chain(receiver.try_iter().take(127)) {
-            recognizer.accept(&resampler.resample(&chunk, false));
+            recognizer.accept(&resampler.resample(&chunk));
         }
         if let Some(text) = recognizer
             .decode()

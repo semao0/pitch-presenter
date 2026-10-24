@@ -23,6 +23,8 @@
   const SPLIT_MIN = 30;
   const SPLIT_MAX = 75;
   const GOTO_TIMEOUT_MS = 2500;
+  /** Pause before auto-advance turns the slide: time to see it coming and press Esc. */
+  const AUTO_DELAY_MS = 1200;
 
   // The parent re-creates this component for every new deck, so the id is fixed.
   const deckId = untrack(() => deck.id);
@@ -39,6 +41,9 @@
   let gotoBuffer = $state('');
   let gotoTimer: ReturnType<typeof setTimeout> | undefined;
   let notesEl = $state<HTMLElement>();
+  let autoAdvance = $state(prefs.get('autoAdvance', false));
+  let autoPending = $state(false);
+  let autoTimer: ReturnType<typeof setTimeout> | undefined;
 
   const plan = $derived(computePlan(deck));
   const note = $derived(deck.notes.slides[view.slide]);
@@ -96,6 +101,31 @@
     send({ type: 'goto', slide: target });
   }
 
+  // ---- auto-advance ------------------------------------------------------------
+
+  $effect(() => prefs.set('autoAdvance', autoAdvance));
+
+  // Any slide change, manual or not, cancels a pending turn.
+  $effect(() => {
+    void view.slide;
+    untrack(cancelAuto);
+  });
+
+  function cancelAuto() {
+    clearTimeout(autoTimer);
+    autoPending = false;
+  }
+
+  function speechFinished() {
+    if (!autoAdvance || autoPending || view.blank || isLast) return;
+    const from = view.slide;
+    autoPending = true;
+    autoTimer = setTimeout(() => {
+      autoPending = false;
+      if (autoAdvance && view.slide === from) go(from + 1);
+    }, AUTO_DELAY_MS);
+  }
+
   function setBlank(blank: boolean) {
     view = { ...view, blank };
     send({ type: 'setBlank', blank });
@@ -109,6 +139,10 @@
       return true;
     }
     if (overview) return overviewKey(key);
+    if (key === 'Escape' && autoPending) {
+      cancelAuto();
+      return true;
+    }
     if (/^\d$/.test(key)) {
       setGoto((gotoBuffer + key).slice(-4));
       return true;
@@ -177,6 +211,11 @@
       case 'a':
       case 'A':
         void api.openAudience();
+        return true;
+      case 'l':
+      case 'L':
+        autoAdvance = !autoAdvance;
+        if (!autoAdvance) cancelAuto();
         return true;
       case 'g':
       case 'G':
@@ -423,10 +462,17 @@
         {#if note?.reserve}<span class="reserve">{t('presenter.reserve')}</span>{/if}
         {#if note?.seconds}<span class="limit tabular"><Icon name="clock" size={13} />{formatDuration(note.seconds * 1000)}</span>{/if}
       </div>
-      <SpeechNotes blocks={note?.blocks ?? []} slide={view.slide} container={notesEl} />
+      <SpeechNotes blocks={note?.blocks ?? []} slide={view.slide} container={notesEl}
+        bind:autoAdvance onfinished={speechFinished} />
       {#if !isLast}
-        <div class="upnext">
-          {t('presenter.then', { title: nextNote?.title ?? t('presenter.slideLower', { n: view.slide + 1 }) })}
+        <div class="upnext" class:pending={autoPending}>
+          {#if autoPending}
+            <span class="countdown" style:animation-duration="{AUTO_DELAY_MS}ms"></span>
+            {t('presenter.autoNext', { title: nextNote?.title ?? t('presenter.slideLower', { n: view.slide + 1 }) })}
+            <kbd>Esc</kbd> {t('presenter.autoNext.cancel')}
+          {:else}
+            {t('presenter.then', { title: nextNote?.title ?? t('presenter.slideLower', { n: view.slide + 1 }) })}
+          {/if}
         </div>
       {/if}
     </section>
@@ -853,6 +899,45 @@
     gap: 4px;
     color: var(--fg-3);
     font-size: 12px;
+  }
+
+  .upnext.pending {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--accent);
+  }
+
+  .upnext kbd {
+    font: 12px var(--mono);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 0 5px;
+  }
+
+  .countdown {
+    position: relative;
+    flex: none;
+    width: 48px;
+    height: 3px;
+    border-radius: 2px;
+    background: var(--line);
+    overflow: hidden;
+  }
+
+  .countdown::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--accent);
+    transform-origin: left;
+    animation: countdown linear forwards;
+    animation-duration: inherit;
+  }
+
+  @keyframes countdown {
+    from { transform: scaleX(0); }
+    to { transform: scaleX(1); }
   }
 
   .upnext {

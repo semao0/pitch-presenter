@@ -38,4 +38,8 @@ curl -fsSL "$url" | tar -xz -C "$tmp"
 mkdir -p "$out"
 cp "$tmp/$lib" "$out/"
 cp "$tmp/LICENSE" "$out/LICENSE.pdfium"
+# PDFium and the libraries built into it (FreeType, ICU, libpng…) ship with the app.
+rm -rf "$out/licenses"
+cp -R "$tmp/licenses" "$out/licenses"
+cp "$tmp/LICENSE" "$out/licenses/pdfium-binaries.txt"
 echo "installed $out/$(basename "$lib")"

@@ -12,6 +12,7 @@
     "core:window:allow-set-title",
     "core:event:allow-emit-to",
     "dialog:allow-open",
+    "opener:default",
     "log:default"
   ]
 }

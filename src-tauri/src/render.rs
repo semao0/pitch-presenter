@@ -228,7 +228,9 @@ impl Renderer {
             .pdfium_dirs
             .iter()
             .find_map(|dir| {
-                Pdfium::bind_to_library(Pdfium::pdfium_platform_library_name_at_path(dir)).ok()
+                Pdfium::bind_to_library(Pdfium::pdfium_platform_library_name_at_path(dir))
+                    .inspect_err(|e| log::warn!("PDFium in {}: {e}", dir.display()))
+                    .ok()
             })
             .map_or_else(Pdfium::bind_to_system_library, Ok)
             .map_err(|e| {

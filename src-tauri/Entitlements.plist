@@ -5,5 +5,8 @@
   <!-- With the hardened runtime macOS silently denies the microphone without this. -->
   <key>com.apple.security.device.audio-input</key>
   <true/>
+  <!-- The bundled PDFium is ad-hoc signed, not by our team: let the app load it. -->
+  <key>com.apple.security.cs.disable-library-validation</key>
+  <true/>
 </dict>
 </plist>
